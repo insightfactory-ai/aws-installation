@@ -66,12 +66,14 @@ Parameters:
 
   DeployPolicyArn:
     Type: String
-    Default: arn:aws:iam::aws:policy/AdministratorAccess
+    Default: ''
     Description: >-
-      Permissions granted to the role. AdministratorAccess is the practical starting
-      point for a first deployment and can be replaced with a scoped
-      customer-managed policy once your own CloudTrail shows exactly which services
-      the platform uses. See SCOPING NOTES at the end of this template.
+      Leave empty. Empty means the role uses the scoped policy this stack creates,
+      which grants the sixteen services the platform actually uses and nothing else.
+      Supply an ARN here only to override it - your own narrower policy, or
+      arn:aws:iam::aws:policy/AdministratorAccess as a temporary fallback if a
+      deployment stops on an AccessDenied for something the scoped policy missed.
+      Tell Insight Factory if you override it. See SCOPING NOTES at the end.
 
   PermissionsBoundaryArn:
     Type: String
@@ -103,6 +105,7 @@ Parameters:
       part-way through.
 
 Conditions:
+  UseSuppliedPolicy: !Not [!Equals [!Ref DeployPolicyArn, '']]
   MakeOidcProvider: !Equals [!Ref CreateOidcProvider, 'Yes']
   HasBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, '']]
   HasSourceIps: !Not [!Equals [!Join ['', !Ref AllowedSourceIps], '']]
@@ -141,16 +144,18 @@ Resources:
       Description: Assumed by Insight Factory GitHub Actions to deploy and maintain the Insight Factory platform.
       MaxSessionDuration: 3600
       PermissionsBoundary: !If [HasBoundary, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
-      ManagedPolicyArns:
-        - !Ref DeployPolicyArn
+      ManagedPolicyArns: !If
+        - UseSuppliedPolicy
+        - [!Ref DeployPolicyArn]
+        - [!Ref IFTerraformDeployPolicy]
       # -------------------------------------------------------------------------
       # Guardrails.
       #
-      # These are explicit denies, and in AWS an explicit deny beats every allow,
-      # including AdministratorAccess. They therefore bound this role whatever
-      # DeployPolicyArn is set to. That is what makes a broad starting policy
-      # reasonable rather than merely convenient: the answer to "what can Insight
-      # Factory do here" is this section, not that parameter.
+      # These are explicit denies, and in AWS an explicit deny beats every allow.
+      # They therefore bound this role whatever DeployPolicyArn is set to - the
+      # scoped policy below, one of your own, or AdministratorAccess if you ever set
+      # it as a fallback. So the answer to "what can Insight Factory do here" is
+      # this section first and that parameter second.
       # -------------------------------------------------------------------------
       Policies:
         - PolicyName: IFTerraformGuardrails
@@ -276,6 +281,63 @@ Resources:
                 - HasSourceIps
                 - { aws:SourceIp: !Ref AllowedSourceIps }
                 - !Ref 'AWS::NoValue'
+      Tags:
+        - { Key: ManagedBy, Value: InsightFactory }
+
+  # -------------------------------------------------------------------------------
+  # What the role may do, when DeployPolicyArn is left empty.
+  #
+  # Sixteen services, and nothing else in AWS. The platform is storage, serverless
+  # compute, data processing, two database engines, caching, notifications,
+  # scheduling, logging and inference - so those are the services here, and the
+  # couple of hundred others are simply absent.
+  #
+  # The grants are at service level rather than enumerated action lists. These
+  # accounts hold nothing but the Insight Factory platform, so a narrower list would
+  # mean you approving a change every time the platform called a new API, without
+  # meaningfully changing what is reachable. The list is derived from the resource
+  # types the deployment declares.
+  #
+  # iam:* is here because the deployment creates and maintains the roughly fifteen
+  # roles its own services run under. What stops that being unlimited is not this
+  # policy but the guardrails on the role above, which deny every mutating IAM action
+  # outside the deployment's own path, refuse to create a role without the boundary,
+  # and refuse to let the boundary be removed or rewritten. Read those first: an
+  # explicit deny overrides any allow here.
+  # -------------------------------------------------------------------------------
+  IFTerraformDeployPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${BoundaryPolicyName}-deploy'
+      Description: >-
+        Services the Insight Factory deployment uses. Attached to IFTerraform unless
+        DeployPolicyArn overrides it. Bounded by that role's inline guardrails.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:*
+              - s3:*
+              - kms:*
+              - secretsmanager:*
+              - lambda:*
+              - glue:*
+              - rds:*
+              - rds-db:connect
+              - elasticache:*
+              - sns:*
+              - scheduler:*
+              - logs:*
+              - cloudwatch:*
+              - xray:*
+              - bedrock:*
+              - iam:*
+              - sts:*
+              - tag:GetResources
+              - tag:TagResources
+              - tag:UntagResources
+            Resource: '*'
       Tags:
         - { Key: ManagedBy, Value: InsightFactory }
 
@@ -411,6 +473,11 @@ Outputs:
   IamPath:
     Description: The IAM path the deployment's roles and groups are confined to.
     Value: !Ref IamPath
+  DeployPolicyInEffect:
+    Description: >-
+      The policy actually attached to IFTerraform. Read it if you want the full list
+      of services the role can reach. Not something you need to send us.
+    Value: !If [UseSuppliedPolicy, !Ref DeployPolicyArn, !Ref IFTerraformDeployPolicy]
 
 # ---------------------------------------------------------------------------------
 # SCOPING NOTES for a security review
@@ -435,12 +502,15 @@ Outputs:
 #    puts on IFTerraform. IFTerraformBoundary is the ceiling we put on the roles
 #    IFTerraform creates. Both can be set, and they do not interact.
 #
-# 3. Services the role actually touches, if you replace AdministratorAccess with a
-#    scoped policy: s3, kms, secretsmanager, lambda, scheduler, logs, cloudwatch,
-#    ec2 (VPC, subnets, security groups, NAT gateway, Elastic IP, route tables,
-#    VPC endpoints), rds, glue, sns, elasticache, iam, sts and tag. This list is
-#    derived from the resource types the deployment declares; confirm it against a
-#    first plan rather than trusting it.
+# 3. Services the role can reach. Read IFTerraformDeployPolicy: ec2, s3, kms,
+#    secretsmanager, lambda, glue, rds, elasticache, sns, scheduler, logs,
+#    cloudwatch, xray, bedrock, iam, sts and the tagging API. Nothing else in AWS
+#    is reachable at all. The list is derived from the resource types the
+#    deployment declares rather than from a completed deployment's CloudTrail, so
+#    it may prove very slightly incomplete on a first install - the failure mode is
+#    an AccessDenied part-way through an apply, not a silent gap. If that happens,
+#    set DeployPolicyArn to AdministratorAccess to get unblocked, tell us what
+#    failed, and we will correct this policy rather than leave you broad.
 #
 # 4. One role or two. This template creates one role, matching the single
 #    deployment identity used in Azure deployments. If you would prefer the

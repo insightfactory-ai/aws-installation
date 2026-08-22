@@ -15,12 +15,13 @@ reviewed — without needing an account or asking us for access.
 ## What you deploy
 
 `insightfactory-aws-access.yaml` — about 470 lines, no external dependencies. It
-creates three things:
+creates four things:
 
 | Resource | What it is |
 |---|---|
 | `GitHubOidcProvider` | An identity provider entry telling your account to trust tokens issued by GitHub Actions. Created once per account. |
 | `IFTerraform` (IAM role) | The role our automation assumes to build and maintain the platform. No user, no key, no password. |
+| `IFTerraformDeployPolicy` (managed policy) | The services the role may reach — sixteen of them, and nothing else in AWS. |
 | `IFTerraformBoundary` (managed policy) | The ceiling on every IAM role the deployment later creates. Yours to read, and yours to tighten. |
 
 Every parameter has a working default, so in the normal case you deploy it without
@@ -44,11 +45,27 @@ to leak, and nothing to revoke except the role itself.
 
 ## What the role can and cannot do
 
-`DeployPolicyArn` defaults to `AdministratorAccess`, which is the practical starting
-point for a first deployment. What makes that reasonable is the guardrail policy
-attached to the role, which is a set of explicit denies — and in AWS an explicit deny
-overrides every allow, including `AdministratorAccess`. So these hold whatever
-`DeployPolicyArn` is set to:
+Two independent limits, and the second holds regardless of the first.
+
+**What it can reach.** By default the role is attached to a policy this stack creates,
+covering the sixteen services the platform uses: `ec2`, `s3`, `kms`, `secretsmanager`,
+`lambda`, `glue`, `rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`,
+`xray`, `bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is
+absent, so the role cannot reach any of them. Read `IFTerraformDeployPolicy` in the
+template for the exact document, or the `DeployPolicyInEffect` stack output for
+whichever policy ended up attached.
+
+The grants are at service level rather than enumerated action lists. These accounts
+hold nothing but the Insight Factory platform, so a narrower list would mean you
+approving a change every time the platform called a new API, without meaningfully
+changing what is reachable.
+
+`iam` is in that list because the deployment creates and maintains the roughly fifteen
+IAM roles the platform's own services run under. Which brings us to the second limit.
+
+**What it cannot do, whatever policy is attached.** The role carries a set of explicit
+denies, and in AWS an explicit deny overrides every allow. These hold even if
+`DeployPolicyArn` is overridden — including with `AdministratorAccess`:
 
 1. **It can only touch its own identities.** Every role and group the deployment
    creates lives under `IamPath` (default `/insightfactory/`). All role and group
@@ -68,12 +85,15 @@ overrides every allow, including `AdministratorAccess`. So these hold whatever
    property your account enforces rather than a claim we make.
 
 `IFTerraformBoundary` is the complete answer to "what is the most any Insight Factory
-role in my account can ever do". Read it in the template. Its service grants are at
-service level rather than enumerated action lists, deliberately: these accounts hold
-nothing but the Insight Factory platform, so a narrower list would mean you had to
-approve a change every time the platform called a new API, without meaningfully
-changing what is reachable. What prevents privilege escalation is the absence of `iam`
-from that policy, not the precision of the entries in it.
+role in my account can ever do". What prevents privilege escalation is the absence of
+`iam` from that policy, not the precision of the entries in it.
+
+**If a deployment stops on an `AccessDenied`.** The scoped policy is derived from the
+resource types the deployment declares rather than from a completed installation's
+CloudTrail, so on a first install it may prove very slightly incomplete. The failure
+mode is loud — an apply that stops part-way, not a silent gap. Setting
+`DeployPolicyArn` to `arn:aws:iam::aws:policy/AdministratorAccess` will unblock it;
+tell us what failed and we will correct the scoped policy rather than leave you broad.
 
 ## Before you start
 
@@ -140,8 +160,8 @@ Three values per account, from the **Outputs** tab. None of them is a secret.
 | `RoleArn` | The role our automation will assume |
 
 Send them to **deployments@insightfactory.ai**, along with which account is the shared
-one. The other two outputs — `BoundaryPolicyArn` and `IamPath` — are for you to read;
-we derive both, so there is nothing to send.
+one. The remaining outputs — `BoundaryPolicyArn`, `IamPath` and `DeployPolicyInEffect` —
+are for you to read. There is nothing to send for any of them.
 
 ## Parameters
 
@@ -150,7 +170,7 @@ we derive both, so there is nothing to send.
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per provider, and a second attempt fails as a duplicate. |
 | `TrustedSubject` | one repo, one branch | Leave exactly as supplied. This is the single control separating our automation from every other caller on GitHub. Do not widen it and do not add a wildcard. |
 | `AllowedSourceIps` | *(empty)* | Optional and recommended. The CI address we supply. Setting it means the role cannot be assumed from anywhere else, even if something were mis-scoped on our side. Applied to the role-assumption call only, so it never interferes with AWS services acting on the role's behalf afterwards. |
-| `DeployPolicyArn` | `AdministratorAccess` | The role's permissions. Bounded by the guardrails above regardless. Can be replaced with a scoped customer-managed policy once your own CloudTrail shows which services the platform uses. |
+| `DeployPolicyArn` | *(empty)* | Leave empty to use the scoped policy this stack creates. Supply an ARN to override it — your own narrower policy, or `AdministratorAccess` as a temporary fallback if a deployment stops on an `AccessDenied`. Bounded by the guardrails either way. Tell us if you override it. |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. A boundary **your** organisation requires on `IFTerraform` itself. Distinct from `IFTerraformBoundary`, which is the ceiling we place on the roles it creates. Tell us if you set it. |
 | `IamPath` | `/insightfactory/` | The path the deployment's roles and groups are confined to. Change it if your naming standard requires, and tell us — the deployment must use the same value. |
 | `BoundaryPolicyName` | `IFTerraformBoundary` | Name of the boundary this stack creates. We derive its ARN from your account ID and this name, so it is not something you send us. |

@@ -21,6 +21,16 @@ Added, relative to the version circulated before this repository existed:
   the boundary, no removing the boundary, no rewriting the boundary policy, and no
   access to Organizations, billing, CloudTrail, GuardDuty, Security Hub, Config, IAM
   users or access keys.
+- **`IFTerraformDeployPolicy`** — the role no longer uses `AdministratorAccess`.
+  `DeployPolicyArn` now defaults to empty, meaning the role is attached to a policy
+  this stack creates covering the sixteen services the platform uses: `ec2`, `s3`,
+  `kms`, `secretsmanager`, `lambda`, `glue`, `rds`, `elasticache`, `sns`, `scheduler`,
+  `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`, `sts`, plus the tagging API. Every
+  other AWS service is unreachable. `AdministratorAccess` remains available as a
+  documented fallback by supplying it to `DeployPolicyArn`, for the case where a first
+  install stops on an `AccessDenied` for something the scoped policy missed.
+- **`DeployPolicyInEffect`** output, so it is unambiguous which policy ended up
+  attached.
 - **`BoundaryPolicyName`** parameter, and `BoundaryPolicyArn` / `IamPath` outputs.
   Neither output needs sending back — we derive both — so the handover is still three
   values per account.
