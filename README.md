@@ -170,7 +170,7 @@ are for you to read. There is nothing to send for any of them.
 | Parameter | Default | |
 |---|---|---|
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per provider, and a second attempt fails as a duplicate. |
-| `TrustedSubject` | one repo, one branch | Leave exactly as supplied. This is the single control separating our automation from every other caller on GitHub. Do not widen it and do not add a wildcard. |
+| `TrustedSubject` | one repo, one branch | Pinned — CloudFormation refuses any other value, including a wildcard. This is the single control separating our automation from every other caller on GitHub. It stays a parameter so it appears on your stack's Parameters tab, where it can be audited without reading the template. |
 | `AllowedSourceIps` | *(empty)* | Optional and recommended. The CI address we supply. Setting it means the role cannot be assumed from anywhere else, even if something were mis-scoped on our side. Applied to the role-assumption call only, so it never interferes with AWS services acting on the role's behalf afterwards. |
 | `DeployPolicyArn` | *(empty)* | Leave empty to use the scoped policy this stack creates. Supply an ARN to override it — your own narrower policy, or `AdministratorAccess` as a temporary fallback if a deployment stops on an `AccessDenied`. Bounded by the guardrails either way. Tell us if you override it. |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. A boundary **your** organisation requires on `IFTerraform` itself. Distinct from `IFTerraformBoundary`, which is the ceiling we place on the roles it creates. Tell us if you set it. |

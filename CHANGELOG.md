@@ -35,6 +35,13 @@ Added, relative to the version circulated before this repository existed:
   Neither output needs sending back — we derive both — so the handover is still three
   values per account.
 
+- **`TrustedSubject` is now pinned by `AllowedPattern`.** It remains a parameter, so
+  the trusted repository and branch appear on your stack's Parameters tab and any
+  change is recorded in the stack history — but CloudFormation refuses a wildcard, a
+  different repository or a different branch at stack-creation time rather than
+  accepting it and quietly weakening the role. A genuine change to this value belongs
+  in a new version of the template.
+
 Clarified:
 
 - `PermissionsBoundaryArn` is a boundary *your* organisation places on `IFTerraform`.

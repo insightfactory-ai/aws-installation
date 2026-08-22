@@ -46,13 +46,24 @@ Parameters:
   TrustedSubject:
     Type: String
     Default: 'repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main'
+    AllowedPattern: '^repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main$'
+    ConstraintDescription: >-
+      TrustedSubject is pinned to one repository on one branch and cannot be edited.
+      A wildcard, a different repository, or a different branch is refused here rather
+      than accepted and quietly weakening the role. If you believe it needs to change,
+      contact Insight Factory - the change belongs in a new version of this template,
+      not in your copy of it.
     Description: >-
-      Leave as supplied. This is the exact GitHub repository and branch whose
-      workflows may assume the role: one repository, one branch, matched exactly.
-      All Insight Factory deployment and release automation runs from that
-      repository; application code repositories never receive access to this
-      account. This value is the control that separates this account from every
-      other caller: do not widen it, and do not add a wildcard.
+      The exact GitHub repository and branch whose workflows may assume the role:
+      one repository, one branch, matched exactly rather than by pattern. All
+      Insight Factory deployment and release automation runs from that repository;
+      application code repositories never receive access to this account. This
+      value is the control that separates this account from every other caller on
+      GitHub, so it is pinned by AllowedPattern above - CloudFormation refuses a
+      wildcard or a different repository rather than letting one through. It is a
+      parameter rather than a hardcoded value so that it appears on your stack's
+      Parameters tab, where an auditor can see what was trusted without reading
+      CloudFormation, and where any future change is recorded in the stack history.
 
   AllowedSourceIps:
     Type: CommaDelimitedList
