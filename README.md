@@ -122,6 +122,10 @@ If it does not match, stop and contact us — do not deploy it.
 
 ## Deploy
 
+Deploy the stack **once in each account**, and create it **in the region the platform
+will run in**, so the stack records the right one for us. Either route below works —
+they do the same thing.
+
 ### Console
 
 1. Open **CloudFormation**, check the region in the top-right corner, and choose
@@ -147,8 +151,6 @@ aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs'
 ```
 
-Deploy it once in each account, and tell us which account is which.
-
 ## What to send us
 
 Three values per account, from the **Outputs** tab. None of them is a secret.
@@ -159,8 +161,8 @@ Three values per account, from the **Outputs** tab. None of them is a secret.
 | `Region` | The region the stack was created in |
 | `RoleArn` | The role our automation will assume |
 
-Send them to **deployments@insightfactory.ai**, along with which account is the shared
-one. The remaining outputs — `BoundaryPolicyArn`, `IamPath` and `DeployPolicyInEffect` —
+Send them to **deployments@insightfactory.ai**, and tell us which account is which —
+which are the environment accounts and which is the shared one. The remaining outputs — `BoundaryPolicyArn`, `IamPath` and `DeployPolicyInEffect` —
 are for you to read. There is nothing to send for any of them.
 
 ## Parameters
