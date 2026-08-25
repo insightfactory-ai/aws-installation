@@ -35,6 +35,14 @@ Added, relative to the version circulated before this repository existed:
   Neither output needs sending back — we derive both — so the handover is still three
   values per account.
 
+- **`MaxSessionDurationSeconds`** (default `14400`, four hours) — the role's
+  `MaxSessionDuration` was fixed at one hour. A first install builds a VPC with a NAT
+  gateway, a database and a Databricks workspace in a single run and can take longer
+  than that, and the session cannot renew itself part way through: one that expires
+  leaves the deployment half applied. The deployment now asks for a session matching
+  this value, so lowering it means telling us — a request above the role's maximum is
+  refused by AWS and no deployment can start.
+
 - **`TrustedSubject` is now pinned by `AllowedPattern`.** It remains a parameter, so
   the trusted repository and branch appear on your stack's Parameters tab and any
   change is recorded in the stack history — but CloudFormation refuses a wildcard, a

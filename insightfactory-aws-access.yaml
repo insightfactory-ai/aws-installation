@@ -31,7 +31,7 @@ Metadata:
       - Label: { default: Who is trusted }
         Parameters: [TrustedSubject, AllowedSourceIps]
       - Label: { default: What the role may do }
-        Parameters: [DeployPolicyArn, PermissionsBoundaryArn]
+        Parameters: [DeployPolicyArn, PermissionsBoundaryArn, MaxSessionDurationSeconds]
 
 Parameters:
   CreateOidcProvider:
@@ -74,6 +74,19 @@ Parameters:
       if something were mis-scoped on the Insight Factory side. Applied to the
       role-assumption call only, so it never interferes with AWS services acting on
       the role's behalf afterwards.
+
+  MaxSessionDurationSeconds:
+    Type: Number
+    Default: 14400
+    MinValue: 3600
+    MaxValue: 43200
+    Description: >-
+      Longest session the role may issue. Four hours by default because a first
+      deployment builds a VPC with a NAT gateway, a database and a Databricks workspace
+      in one run, and can take longer than an hour. The session cannot renew itself
+      part way through, so one that expires leaves the deployment half applied. Lower it
+      only if your organisation requires it, and tell Insight Factory: the deployment
+      asks for a matching duration and the request fails if it exceeds this value.
 
   DeployPolicyArn:
     Type: String
@@ -153,7 +166,7 @@ Resources:
     Properties:
       RoleName: IFTerraform
       Description: Assumed by Insight Factory GitHub Actions to deploy and maintain the Insight Factory platform.
-      MaxSessionDuration: 3600
+      MaxSessionDuration: !Ref MaxSessionDurationSeconds
       PermissionsBoundary: !If [HasBoundary, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
       ManagedPolicyArns: !If
         - UseSuppliedPolicy
