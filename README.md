@@ -14,18 +14,26 @@ reviewed — without needing an account or asking us for access.
 
 ## What you deploy
 
-`insightfactory-aws-access.yaml` — about 470 lines, no external dependencies. It
+`insightfactory-aws-access.yaml` — about 460 lines, no external dependencies. It
 creates four things:
 
 | Resource | What it is |
 |---|---|
 | `GitHubOidcProvider` | An identity provider entry telling your account to trust tokens issued by GitHub Actions. Created once per account. |
 | `IFTerraform` (IAM role) | The role our automation assumes to build and maintain the platform. No user, no key, no password. |
-| `IFTerraformDeployPolicy` (managed policy) | The services the role may reach — sixteen of them, and nothing else in AWS. |
+| `IFTerraformDeploy` (managed policy) | The services the role may reach — sixteen of them, and nothing else in AWS. |
 | `IFTerraformBoundary` (managed policy) | The ceiling on every IAM role the deployment later creates. Yours to read, and yours to tighten. |
 
-Every parameter has a working default, so in the normal case you deploy it without
-filling anything in.
+**In the normal case there is nothing to fill in.** Everything the stack trusts — the
+repository and branch, our CI addresses, the session length, the policy names — is
+written into the template rather than asked of you, so none of it can drift between
+the file your security team reviewed and the stack you deployed. Changing any of it
+means a new version of the template, not an edit to your copy.
+
+Three parameters remain, all with working defaults, because your account and your
+organisation decide them rather than us: whether to create the identity provider
+entry, the IAM path, and whether to place one of your own permissions boundaries on
+the role. See [Parameters](#parameters).
 
 ## How access works
 
@@ -33,12 +41,24 @@ Rather than holding credentials for your account, our automation presents a
 short-lived, cryptographically signed token that GitHub issues each time it runs, and
 your account exchanges that token for a temporary session in the role above.
 
-The role's trust policy accepts a token only if two claims match exactly:
+The role's trust policy accepts a token only if both claims match exactly:
 
 - `aud` is `sts.amazonaws.com`, so a token minted for any other service cannot be
   replayed here.
 - `sub` is one repository on one branch, matched exactly rather than by pattern. No
   other repository on GitHub — including our own — can obtain a session.
+
+And only from four addresses. Our release pipelines have static egress — two in the
+primary region, two in the failover region — and the trust policy names them, so the
+role cannot be assumed from anywhere else even if something were mis-scoped on our
+side. The addresses identify *an Insight Factory CI job*; the repository and branch
+identify *the pipeline*. They are independent layers and neither replaces the other.
+If our addresses ever change, that is a new version of this template and a stack
+update for you — which is the point: our CI cannot move without you seeing it.
+
+The condition applies to the role-assumption call only, not to the role's permissions,
+so it never interferes with AWS services acting on the role's behalf afterwards. See
+scoping note 4 in the template for why.
 
 There is no shared secret in this arrangement, so there is nothing to rotate, nothing
 to leak, and nothing to revoke except the role itself.
@@ -47,13 +67,12 @@ to leak, and nothing to revoke except the role itself.
 
 Two independent limits, and the second holds regardless of the first.
 
-**What it can reach.** By default the role is attached to a policy this stack creates,
-covering the sixteen services the platform uses: `ec2`, `s3`, `kms`, `secretsmanager`,
+**What it can reach.** The role is attached to a policy this stack creates, covering
+the sixteen services the platform uses: `ec2`, `s3`, `kms`, `secretsmanager`,
 `lambda`, `glue`, `rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`,
 `xray`, `bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is
 absent, so the role cannot reach any of them. Read `IFTerraformDeployPolicy` in the
-template for the exact document, or the `DeployPolicyInEffect` stack output for
-whichever policy ended up attached.
+template for the exact document.
 
 The grants are at service level rather than enumerated action lists. These accounts
 hold nothing but the Insight Factory platform, so a narrower list would mean you
@@ -64,8 +83,8 @@ changing what is reachable.
 IAM roles the platform's own services run under. Which brings us to the second limit.
 
 **What it cannot do, whatever policy is attached.** The role carries a set of explicit
-denies, and in AWS an explicit deny overrides every allow. These hold even if
-`DeployPolicyArn` is overridden — including with `AdministratorAccess`:
+denies, and in AWS an explicit deny overrides every allow. They hold whatever policy
+is attached to the role, now or in any future version of this template:
 
 1. **It can only touch its own identities.** Every role and group the deployment
    creates lives under `IamPath` (default `/insightfactory/`). All role and group
@@ -91,9 +110,10 @@ role in my account can ever do". What prevents privilege escalation is the absen
 **If a deployment stops on an `AccessDenied`.** The scoped policy is derived from the
 resource types the deployment declares rather than from a completed installation's
 CloudTrail, so on a first install it may prove very slightly incomplete. The failure
-mode is loud — an apply that stops part-way, not a silent gap. Setting
-`DeployPolicyArn` to `arn:aws:iam::aws:policy/AdministratorAccess` will unblock it;
-tell us what failed and we will correct the scoped policy rather than leave you broad.
+mode is loud — an apply that stops part-way, not a silent gap. There is no parameter
+to widen it with: tell us what failed and we will issue a corrected version of this
+template. That keeps the change reviewable and recorded, rather than made once in your
+account and forgotten.
 
 ## Before you start
 
@@ -102,8 +122,6 @@ tell us what failed and we will correct the scoped policy rather than leave you 
 - Permission in them to create an IAM role, an IAM identity provider, an IAM managed
   policy and a CloudFormation stack. That normally means an administrator.
 - The region decided.
-- The CI address we supply for `AllowedSourceIps`, if you want that restriction — see
-  the parameters table.
 
 ## Verify the download
 
@@ -131,7 +149,9 @@ they do the same thing.
 1. Open **CloudFormation**, check the region in the top-right corner, and choose
    **Create stack → With new resources**.
 2. Choose **Upload a template file** and select `insightfactory-aws-access.yaml`.
-3. Name the stack `insightfactory-access` and continue past the parameters as they are.
+3. Name the stack `insightfactory-access` and continue past the parameters as they are,
+   unless your organisation's standards require a different `IamPath` or a permissions
+   boundary on the role.
 4. On the last page, acknowledge that the stack creates IAM resources with custom
    names, and create it.
 5. When it reaches `CREATE_COMPLETE`, open the **Outputs** tab.
@@ -162,20 +182,34 @@ Three values per account, from the **Outputs** tab. None of them is a secret.
 | `RoleArn` | The role our automation will assume |
 
 Send them to **deployments@insightfactory.ai**, and tell us which account is which —
-which are the environment accounts and which is the shared one. The remaining outputs — `BoundaryPolicyArn`, `IamPath` and `DeployPolicyInEffect` —
-are for you to read. There is nothing to send for any of them.
+which are the environment accounts and which is the shared one.
+
+**Also send `IamPath` if you changed it from the default** — our deployment must be
+configured with the same value, and will be denied by its own guardrails on the first
+apply if it is not. **And tell us if you set `PermissionsBoundaryArn`.** The remaining
+outputs — `OidcProviderArn`, `DeployPolicyArn` and
+`BoundaryPolicyArn` — are for you to read. There is nothing to send for any of them.
 
 ## Parameters
 
+Three, and each exists because your account or your organisation decides it rather
+than us. All three have working defaults, and the defaults are correct unless your
+organisation imposes a standard of its own.
+
 | Parameter | Default | |
 |---|---|---|
-| `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per provider, and a second attempt fails as a duplicate. |
-| `TrustedSubject` | one repo, one branch | Pinned — CloudFormation refuses any other value, including a wildcard. This is the single control separating our automation from every other caller on GitHub. It stays a parameter so it appears on your stack's Parameters tab, where it can be audited without reading the template. |
-| `AllowedSourceIps` | *(empty)* | Optional and recommended. The CI address we supply. Setting it means the role cannot be assumed from anywhere else, even if something were mis-scoped on our side. Applied to the role-assumption call only, so it never interferes with AWS services acting on the role's behalf afterwards. |
-| `DeployPolicyArn` | *(empty)* | Leave empty to use the scoped policy this stack creates. Supply an ARN to override it — your own narrower policy, or `AdministratorAccess` as a temporary fallback if a deployment stops on an `AccessDenied`. Bounded by the guardrails either way. Tell us if you override it. |
-| `PermissionsBoundaryArn` | *(empty)* | Optional. A boundary **your** organisation requires on `IFTerraform` itself. Distinct from `IFTerraformBoundary`, which is the ceiling we place on the roles it creates. Tell us if you set it. |
-| `IamPath` | `/insightfactory/` | The path the deployment's roles and groups are confined to. Change it if your naming standard requires, and tell us — the deployment must use the same value. |
-| `BoundaryPolicyName` | `IFTerraformBoundary` | Name of the boundary this stack creates. We derive its ARN from your account ID and this name, so it is not something you send us. |
+| `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per identity provider, and a second attempt fails as a duplicate. |
+| `IamPath` | `/insightfactory/` | The path every role and group the deployment creates is confined to. Change it if your IAM naming standard requires — and **tell us**, because our deployment must be configured with the same value or it is denied by its own guardrails on the first apply. A bare `/` is refused: it would make the guardrails apply to every role in your account rather than to ours. |
+| `PermissionsBoundaryArn` | *(empty)* | Optional. If your organisation requires a permissions boundary on every IAM principal, supply its ARN and it is applied to `IFTerraform`. **Tell us if you set it** — your boundary intersects with everything the role is granted, so one narrower than the platform needs fails a deployment part-way through, with resources already created. |
+
+> `PermissionsBoundaryArn` is a boundary **your** organisation places on `IFTerraform`.
+> `IFTerraformBoundary` is the ceiling **we** place on the roles `IFTerraform` later
+> creates. Both can be set, and they do not interact.
+
+Everything else is fixed in the template: the trusted repository and branch, our CI
+addresses, the four-hour maximum session, and the `IFTerraformDeploy` and
+`IFTerraformBoundary` policy names. Read them in the file — that is now the only place
+they can be.
 
 > **If you tighten `IFTerraformBoundary`, tell us.** Loosening it is harmless.
 > Tightening it below what the platform needs fails a deployment part-way through,
@@ -186,9 +220,8 @@ are for you to read. There is nothing to send for any of them.
 Delete the stack. Every session our automation could obtain disappears with the role,
 and there is no credential that outlives it.
 
-To suspend access without deleting, narrow or remove the `TrustedSubject` condition on
-the role's trust policy. That change is yours to make, and we cannot widen it from our
-side.
+To suspend access without deleting, edit or remove the `sub` condition on the role's
+trust policy. That change is yours to make, and we cannot widen it from our side.
 
 ## Auditing
 

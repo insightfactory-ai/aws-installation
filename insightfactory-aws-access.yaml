@@ -5,11 +5,12 @@ Description: >-
   and one IAM role that Insight Factory's automation assumes to deploy and maintain
   the Insight Factory platform in this AWS account. No IAM users, no access keys and
   no long-lived credentials are created: every session is obtained by exchanging a
-  short-lived, signed GitHub-issued token, and only from the named repositories.
+  short-lived, signed GitHub-issued token, from one repository and one branch, and
+  only from Insight Factory's published CI addresses.
 
 # ---------------------------------------------------------------------------------
-# Deploy ONCE PER AWS ACCOUNT that will host Insight Factory resources. Every
-# parameter has a working default, so normally you deploy it as-is.
+# Deploy ONCE PER AWS ACCOUNT that will host Insight Factory resources, in the region
+# the platform will run in. There is nothing to fill in.
 #
 #   aws cloudformation deploy \
 #     --template-file insightfactory-aws-access.yaml \
@@ -19,130 +20,85 @@ Description: >-
 #
 # Then send the Outputs back to Insight Factory.
 #
-# The platform uses one AWS account per environment: dev, test, prod, and one
-# shared account. Deploy this stack once in each of those accounts.
+# The platform uses one AWS account per environment: dev, test, prod, and one shared
+# account. Deploy this stack once in each of those accounts.
+#
+# Everything this stack trusts is written into it: the repository and branch, the CI
+# addresses, the session length, the policy names. None of it is a parameter, so none
+# of it can drift between the file your security team reviewed and the stack you
+# deployed. A change to any of it is a new version of this template.
+#
+# The three parameters that remain are the ones your own account and organisation
+# decide rather than us. All three have working defaults, and the defaults are correct
+# unless your organisation imposes a standard of its own.
 # ---------------------------------------------------------------------------------
 
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-      - Label: { default: Identity provider }
-        Parameters: [CreateOidcProvider]
-      - Label: { default: Who is trusted }
-        Parameters: [TrustedSubject, AllowedSourceIps]
-      - Label: { default: What the role may do }
-        Parameters: [DeployPolicyArn, PermissionsBoundaryArn, MaxSessionDurationSeconds]
-
 Parameters:
+  # AWS account state decides this one, not you. An account holds one entry per
+  # identity provider; if something else here already trusts
+  # token.actions.githubusercontent.com, creating a second fails as a duplicate.
   CreateOidcProvider:
     Type: String
     AllowedValues: ['Yes', 'No']
     Default: 'Yes'
     Description: >-
       Leave as Yes. Set to No only if this AWS account already trusts
-      https://token.actions.githubusercontent.com. An account can only hold one
-      entry per identity provider, and a second attempt fails as a duplicate.
+      https://token.actions.githubusercontent.com from an earlier stack.
 
-  TrustedSubject:
-    Type: String
-    Default: 'repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main'
-    AllowedPattern: '^repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main$'
-    ConstraintDescription: >-
-      TrustedSubject is pinned to one repository on one branch and cannot be edited.
-      A wildcard, a different repository, or a different branch is refused here rather
-      than accepted and quietly weakening the role. If you believe it needs to change,
-      contact Insight Factory - the change belongs in a new version of this template,
-      not in your copy of it.
-    Description: >-
-      The exact GitHub repository and branch whose workflows may assume the role:
-      one repository, one branch, matched exactly rather than by pattern. All
-      Insight Factory deployment and release automation runs from that repository;
-      application code repositories never receive access to this account. This
-      value is the control that separates this account from every other caller on
-      GitHub, so it is pinned by AllowedPattern above - CloudFormation refuses a
-      wildcard or a different repository rather than letting one through. It is a
-      parameter rather than a hardcoded value so that it appears on your stack's
-      Parameters tab, where an auditor can see what was trusted without reading
-      CloudFormation, and where any future change is recorded in the stack history.
-
-  AllowedSourceIps:
-    Type: CommaDelimitedList
-    Default: ''
-    Description: >-
-      Optional and recommended. The address Insight Factory supplies for its CI
-      network. Setting it means the role cannot be assumed from anywhere else, even
-      if something were mis-scoped on the Insight Factory side. Applied to the
-      role-assumption call only, so it never interferes with AWS services acting on
-      the role's behalf afterwards.
-
-  MaxSessionDurationSeconds:
-    Type: Number
-    Default: 14400
-    MinValue: 3600
-    MaxValue: 43200
-    Description: >-
-      Longest session the role may issue. Four hours by default because a first
-      deployment builds a VPC with a NAT gateway, a database and a Databricks workspace
-      in one run, and can take longer than an hour. The session cannot renew itself
-      part way through, so one that expires leaves the deployment half applied. Lower it
-      only if your organisation requires it, and tell Insight Factory: the deployment
-      asks for a matching duration and the request fails if it exceeds this value.
-
-  DeployPolicyArn:
-    Type: String
-    Default: ''
-    Description: >-
-      Leave empty. Empty means the role uses the scoped policy this stack creates,
-      which grants the sixteen services the platform actually uses and nothing else.
-      Supply an ARN here only to override it - your own narrower policy, or
-      arn:aws:iam::aws:policy/AdministratorAccess as a temporary fallback if a
-      deployment stops on an AccessDenied for something the scoped policy missed.
-      Tell Insight Factory if you override it. See SCOPING NOTES at the end.
-
-  PermissionsBoundaryArn:
-    Type: String
-    Default: ''
-    Description: >-
-      Optional. If your organisation requires a permissions boundary on IAM
-      principals, supply its ARN. Tell Insight Factory if you set it.
-
+  # And your organisation decides this one. It is a parameter rather than a fixed
+  # value because IAM naming standards are commonly enforced by an SCP, and a stack
+  # that cannot honour yours is a stack you cannot deploy at all.
   IamPath:
     Type: String
     Default: /insightfactory/
-    AllowedPattern: '^/([A-Za-z0-9_.,+@=-]+/)*$'
+    AllowedPattern: '^/([A-Za-z0-9_.,+@=-]+/)+$'
+    ConstraintDescription: >-
+      IamPath must begin and end with / and contain at least one segment, for example
+      /insightfactory/ or /company/vendors/insightfactory/. A bare / is refused: it
+      would make the guardrails below apply to every role in the account rather than
+      to ours, which reads like a tightening and is the opposite.
     Description: >-
-      Leave as supplied. The IAM path under which every role and group the
-      deployment creates is placed. It grants nothing by itself: it is what lets
-      the guardrails below say "only under here" instead of "anywhere in this
-      account". If your naming standard requires a different path, change it and
-      tell Insight Factory, because the deployment must use the same value.
+      The IAM path under which every role and group the deployment creates is placed.
+      It grants nothing by itself: it is what lets the guardrails below say "only under
+      here" instead of "anywhere in this account". Leave it as supplied unless your
+      naming standard requires otherwise - and if you change it, tell Insight Factory,
+      because the deployment must be configured with the same value or it will be
+      denied by its own guardrails on the first apply.
 
-  BoundaryPolicyName:
+  # And so does this one. Some organisations require a permissions boundary on every
+  # IAM principal, enforced by an SCP that refuses CreateRole without one. Without
+  # this parameter such an account cannot deploy the stack at all, and the failure is
+  # a generic SCP denial that does not say why.
+  #
+  # Note this is a boundary YOU place on IFTerraform. It is not IFTerraformBoundary,
+  # which is the ceiling this stack places on the roles IFTerraform later creates.
+  # Both can be set; they do not interact.
+  PermissionsBoundaryArn:
     Type: String
-    Default: IFTerraformBoundary
+    Default: ''
+    AllowedPattern: '^(arn:aws[a-zA-Z-]*:iam::([0-9]{12}|aws):policy/.+)?$'
+    ConstraintDescription: >-
+      Leave empty, or supply the full ARN of an IAM managed policy - your own, for
+      example arn:aws:iam::123456789012:policy/OrgBoundary, or an AWS-managed one.
     Description: >-
-      Leave as supplied. Name of the permissions boundary this stack creates and
-      that every role the deployment makes must carry. Insight Factory derives its
-      ARN from your account ID and this name, so it is not something you send us.
-      Rename it and tell us, or read it and tighten it - but tell us if you do,
-      because a boundary narrower than the platform needs fails the deployment
-      part-way through.
+      Optional. If your organisation requires a permissions boundary on IAM principals,
+      supply its ARN and it is applied to IFTerraform. Tell Insight Factory if you set
+      it: your boundary intersects with everything the role is granted, so one narrower
+      than the platform needs fails the deployment part-way through, with resources
+      already created.
 
 Conditions:
-  UseSuppliedPolicy: !Not [!Equals [!Ref DeployPolicyArn, '']]
   MakeOidcProvider: !Equals [!Ref CreateOidcProvider, 'Yes']
   HasBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, '']]
-  HasSourceIps: !Not [!Equals [!Join ['', !Ref AllowedSourceIps], '']]
 
 Resources:
 
   # -------------------------------------------------------------------------------
   # GitHub as an OIDC identity provider.
   #
-  # ThumbprintList is deliberately omitted. AWS validates tokens from GitHub
-  # against its own library of trusted root certificate authorities, so a pinned
-  # thumbprint is both unnecessary and a future outage when GitHub rotates
-  # certificates.
+  # ThumbprintList is deliberately omitted. AWS validates GitHub's tokens against its
+  # own library of trusted root CAs, so a pinned thumbprint is both unnecessary and a
+  # future outage when GitHub rotates certificates.
   # -------------------------------------------------------------------------------
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
@@ -157,29 +113,59 @@ Resources:
   # -------------------------------------------------------------------------------
   # The single role Insight Factory's automation assumes. It both maintains the
   # platform infrastructure and publishes application releases into it, the same
-  # arrangement as the single Insight Factory DevOps service principal used in
-  # Azure deployments. Both run from the one release repository named in
-  # TrustedSubject; application code repositories have no path into this account.
+  # arrangement as the single Insight Factory DevOps service principal used in Azure
+  # deployments. Both run from the one release repository named in the trust policy;
+  # application code repositories have no path into this account.
   # -------------------------------------------------------------------------------
   InsightFactoryRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: IFTerraform
       Description: Assumed by Insight Factory GitHub Actions to deploy and maintain the Insight Factory platform.
-      MaxSessionDuration: !Ref MaxSessionDurationSeconds
+      # Four hours. A first deployment builds a VPC with a NAT gateway, a database and
+      # a Databricks workspace in one run and can take longer than an hour, and a
+      # session cannot renew itself part way through: one that expires leaves the
+      # deployment half applied.
+      MaxSessionDuration: 14400
+      # Absent entirely unless PermissionsBoundaryArn was supplied. Yours, on this
+      # role - not IFTerraformBoundary, which is ours, on the roles this one creates.
       PermissionsBoundary: !If [HasBoundary, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
-      ManagedPolicyArns: !If
-        - UseSuppliedPolicy
-        - [!Ref DeployPolicyArn]
-        - [!Ref IFTerraformDeployPolicy]
+      ManagedPolicyArns:
+        - !Ref IFTerraformDeployPolicy
+
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                # aud pins the token to one minted for AWS specifically, so a token
+                # GitHub issued for any other service cannot be replayed here.
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # sub pins it to one repository and one branch, matched exactly, not
+                # by pattern. Nothing else on GitHub can obtain a session.
+                token.actions.githubusercontent.com:sub: 'repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main'
+              # And only from Insight Factory's release pipelines. These are static
+              # egress addresses: two in the primary region, two in the failover
+              # region. The condition is on the assumption call, not on the role's
+              # permissions - see note 4 at the end.
+              IpAddress:
+                aws:SourceIp:
+                  - 192.240.244.134/32   # primary   (us-west)
+                  - 192.240.244.165/32   # primary   (us-west)
+                  - 152.236.40.73/32     # failover  (us-east)
+                  - 152.236.40.227/32    # failover  (us-east)
+
       # -------------------------------------------------------------------------
       # Guardrails.
       #
-      # These are explicit denies, and in AWS an explicit deny beats every allow.
-      # They therefore bound this role whatever DeployPolicyArn is set to - the
-      # scoped policy below, one of your own, or AdministratorAccess if you ever set
-      # it as a fallback. So the answer to "what can Insight Factory do here" is
-      # this section first and that parameter second.
+      # These are explicit denies, and in AWS an explicit deny beats every allow, so
+      # they bound this role whatever policy is attached to it now or later. The
+      # answer to "what can Insight Factory do here" is this section first and the
+      # attached policy second.
       # -------------------------------------------------------------------------
       Policies:
         - PolicyName: IFTerraformGuardrails
@@ -187,13 +173,13 @@ Resources:
             Version: '2012-10-17'
             Statement:
 
-              # 1. Identities: only its own. Everything the deployment creates
-              # lives under IamPath, so denying these actions anywhere else means
-              # the role cannot read, alter or delete an identity it did not
-              # create - including editing its own trust policy to widen who may
-              # assume it. PassRole is in this list deliberately: without it the
-              # role could hand one of your existing privileged roles to a
-              # function it creates, and inherit that privilege through it.
+              # 1. Identities: only its own. Everything the deployment creates lives
+              # under IamPath, so denying these actions anywhere else means
+              # the role cannot read, alter or delete an identity it did not create -
+              # including editing its own trust policy to widen who may assume it.
+              # PassRole is in this list deliberately: without it the role could hand
+              # one of your existing privileged roles to a function it creates, and
+              # inherit that privilege through it.
               - Effect: Deny
                 Action:
                   - iam:CreateRole
@@ -223,10 +209,7 @@ Resources:
 
               # 2. Every role it creates must carry the boundary below. Statement 1
               # alone would still allow a role under our own path with
-              # AdministratorAccess attached to it, which would make the path
-              # decoration. iam:PermissionsBoundary is the request condition AWS
-              # evaluates against the boundary being set on the new role, so a
-              # CreateRole that omits it is refused outright.
+              # AdministratorAccess attached, which would make the path decoration.
               - Effect: Deny
                 Action:
                   - iam:CreateRole
@@ -241,10 +224,10 @@ Resources:
                 Action: iam:DeleteRolePermissionsBoundary
                 Resource: '*'
 
-              # 4. And it cannot rewrite the boundary itself. Without this the
-              # entire arrangement is decorative - the role would simply publish a
-              # new default version of the policy that caps it. This is the single
-              # statement that makes the two above mean anything.
+              # 4. And it cannot rewrite the boundary itself. Without this the whole
+              # arrangement is decorative - the role would publish a new default
+              # version of the policy that caps it. This is the statement that makes
+              # the two above mean anything.
               - Effect: Deny
                 Action:
                   - iam:CreatePolicyVersion
@@ -255,9 +238,9 @@ Resources:
 
               # 5. Account-level controls are yours alone. The role builds and
               # operates a platform; it has no business in your organisation, your
-              # bill, or the audit trail that makes everything above verifiable.
-              # The IAM user and access-key denies are here so that "no users, no
-              # keys" is a property your account enforces, not a claim we make.
+              # bill, or the audit trail that makes everything above verifiable. The
+              # IAM user and access-key denies are here so that "no users, no keys" is
+              # a property your account enforces, not a claim we make.
               - Effect: Deny
                 Action:
                   - organizations:*
@@ -285,57 +268,36 @@ Resources:
                   - iam:UpdateAccountPasswordPolicy
                   - iam:DeleteAccountPasswordPolicy
                 Resource: '*'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                # aud pins the token to one minted for AWS specifically, so a token
-                # GitHub issued for any other service cannot be replayed here.
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                # sub pins it to one repository and one branch, matched exactly:
-                # not a pattern. Nothing else in GitHub can obtain a session.
-                token.actions.githubusercontent.com:sub: !Ref TrustedSubject
-              # Absent entirely unless AllowedSourceIps was supplied.
-              IpAddress: !If
-                - HasSourceIps
-                - { aws:SourceIp: !Ref AllowedSourceIps }
-                - !Ref 'AWS::NoValue'
       Tags:
         - { Key: ManagedBy, Value: InsightFactory }
 
   # -------------------------------------------------------------------------------
-  # What the role may do, when DeployPolicyArn is left empty.
+  # What the role may do.
   #
   # Sixteen services, and nothing else in AWS. The platform is storage, serverless
   # compute, data processing, two database engines, caching, notifications,
-  # scheduling, logging and inference - so those are the services here, and the
-  # couple of hundred others are simply absent.
+  # scheduling, logging and inference - so those are the services here, and the couple
+  # of hundred others are simply absent.
   #
   # The grants are at service level rather than enumerated action lists. These
   # accounts hold nothing but the Insight Factory platform, so a narrower list would
   # mean you approving a change every time the platform called a new API, without
-  # meaningfully changing what is reachable. The list is derived from the resource
-  # types the deployment declares.
+  # meaningfully changing what is reachable.
   #
   # iam:* is here because the deployment creates and maintains the roughly fifteen
   # roles its own services run under. What stops that being unlimited is not this
   # policy but the guardrails on the role above, which deny every mutating IAM action
-  # outside the deployment's own path, refuse to create a role without the boundary,
-  # and refuse to let the boundary be removed or rewritten. Read those first: an
-  # explicit deny overrides any allow here.
+  # outside IamPath, refuse to create a role without the boundary, and refuse
+  # to let the boundary be removed or rewritten. Read those first: an explicit deny
+  # overrides any allow here.
   # -------------------------------------------------------------------------------
   IFTerraformDeployPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Sub '${BoundaryPolicyName}-deploy'
+      ManagedPolicyName: IFTerraformDeploy
       Description: >-
-        Services the Insight Factory deployment uses. Attached to IFTerraform unless
-        DeployPolicyArn overrides it. Bounded by that role's inline guardrails.
+        Services the Insight Factory deployment uses. Attached to IFTerraform and
+        bounded by that role's inline guardrails.
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -362,30 +324,24 @@ Resources:
               - tag:TagResources
               - tag:UntagResources
             Resource: '*'
-      Tags:
-        - { Key: ManagedBy, Value: InsightFactory }
 
   # -------------------------------------------------------------------------------
   # The ceiling on every role the deployment creates.
   #
   # A permissions boundary is not a grant. A role's effective permissions are the
-  # intersection of what it is granted and what this policy permits, so this file is
-  # the complete answer to "what is the most any Insight Factory role in my account
-  # can ever do" - roughly fifteen roles per account, none of which can exceed it,
+  # intersection of what it is granted and what this policy permits, so this is the
+  # complete answer to "what is the most any Insight Factory role in my account can
+  # ever do" - roughly fifteen roles per account, none of which can exceed it,
   # whatever policy is attached to them. Statement 2 of the guardrails above refuses
   # to create a role without it.
   #
-  # The grants are deliberately at service level rather than enumerated action lists.
-  # These accounts hold nothing but the Insight Factory platform, so a narrower s3 or
-  # ec2 list would add real maintenance cost - every new API the platform calls
-  # becomes a change you must make before we can deploy - without meaningfully
-  # changing what is reachable. What prevents privilege escalation here is the
-  # absence of iam from the list, not the precision of the entries that are in it.
+  # Service level again, for the same reason. What prevents privilege escalation here
+  # is the absence of iam from the list, not the precision of the entries in it.
   # -------------------------------------------------------------------------------
   IFTerraformBoundary:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Ref BoundaryPolicyName
+      ManagedPolicyName: IFTerraformBoundary
       Description: >-
         Ceiling for every IAM role the Insight Factory deployment creates in this
         account. No such role can exceed this policy, whatever is attached to it.
@@ -393,9 +349,9 @@ Resources:
         Version: '2012-10-17'
         Statement:
 
-          # What the platform's roles do at runtime: storage, serverless compute,
-          # data processing, the databases, caching, notifications, scheduling,
-          # logging and tracing.
+          # What the platform's roles do at runtime: storage, serverless compute, data
+          # processing, the databases, caching, notifications, scheduling, logging and
+          # tracing.
           - Effect: Allow
             Action:
               - ec2:*
@@ -446,10 +402,9 @@ Resources:
               - iam:PassRole
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role${IamPath}*'
 
-          # Databricks spot instances need the EC2 spot service-linked role, which
-          # AWS creates on first use. It is the only IAM write inside this ceiling,
-          # and the condition means it can only ever produce that one AWS-managed
-          # role.
+          # Databricks spot instances need the EC2 spot service-linked role, which AWS
+          # creates on first use. It is the only IAM write inside this ceiling, and the
+          # condition means it can only ever produce that one AWS-managed role.
           - Effect: Allow
             Action: iam:CreateServiceLinkedRole
             Resource: '*'
@@ -457,8 +412,8 @@ Resources:
               StringLike:
                 iam:AWSServiceName: spot.amazonaws.com
 
-          # Belt and braces. A boundary is an allow-list, so everything absent from
-          # the statements above is already capped out; these are written explicitly
+          # Belt and braces. A boundary is an allow-list, so everything absent from the
+          # statements above is already capped out; these are written explicitly
           # because they are the ones a reviewer looks for.
           - Effect: Deny
             Action:
@@ -471,8 +426,6 @@ Resources:
               - config:Delete*
               - config:Stop*
             Resource: '*'
-      Tags:
-        - { Key: ManagedBy, Value: InsightFactory }
 
 Outputs:
   AwsAccountId:
@@ -488,76 +441,80 @@ Outputs:
     Condition: MakeOidcProvider
     Description: The GitHub identity provider this stack created.
     Value: !Ref GitHubOidcProvider
+  DeployPolicyArn:
+    Description: >-
+      The policy attached to IFTerraform. Read it for the full list of services the
+      role can reach. Not something you need to send us.
+    Value: !Ref IFTerraformDeployPolicy
+  IamPath:
+    Description: >-
+      The path the deployment's roles and groups are confined to. Send it to Insight
+      Factory only if you changed it from the default; the deployment must be
+      configured with the same value.
+    Value: !Ref IamPath
   BoundaryPolicyArn:
     Description: >-
       The ceiling this stack created for every role the deployment makes. Read it if
       you want to know the most any Insight Factory role here can do. Not something
       you need to send us.
     Value: !Ref IFTerraformBoundary
-  IamPath:
-    Description: The IAM path the deployment's roles and groups are confined to.
-    Value: !Ref IamPath
-  DeployPolicyInEffect:
-    Description: >-
-      The policy actually attached to IFTerraform. Read it if you want the full list
-      of services the role can reach. Not something you need to send us.
-    Value: !If [UseSuppliedPolicy, !Ref DeployPolicyArn, !Ref IFTerraformDeployPolicy]
 
 # ---------------------------------------------------------------------------------
 # SCOPING NOTES for a security review
 #
-# 1. No credential to steal. The role is assumable only by presenting a token
-#    signed by GitHub whose claims match the conditions above. Nothing is shared
-#    between the two organisations that could be copied, leaked or replayed: no
-#    password, no access key, no shared secret.
+# 1. No credential to steal. The role is assumable only by presenting a token signed
+#    by GitHub whose claims match the trust policy above, from one of four addresses.
+#    Nothing is shared between the two organisations that could be copied, leaked or
+#    replayed: no password, no access key, no shared secret.
 #
-# 2. Why the role needs IAM write access, and what stops that being unlimited.
-#    The platform's serverless functions, data-processing jobs, database
-#    authentication and Databricks integration all run under IAM roles that the
-#    deployment creates and maintains, roughly fifteen per environment. Anything
-#    able to create a role and attach a policy to it could otherwise create an
-#    administrator and assume it, so three controls sit on top of that ability:
-#    the roles are confined to IamPath, each must carry the IFTerraformBoundary
-#    ceiling, and the role cannot edit that ceiling. Read the Policies block on
-#    IFTerraformRole and the boundary policy itself - between them they are the
-#    answer to this question, and they apply whatever DeployPolicyArn says.
+# 2. Why the role needs IAM write access, and what stops that being unlimited. The
+#    platform's serverless functions, data-processing jobs, database authentication
+#    and Databricks integration all run under IAM roles the deployment creates and
+#    maintains, roughly fifteen per environment. Anything able to create a role and
+#    attach a policy to it could otherwise create an administrator and assume it, so
+#    three controls sit on top of that ability: the roles are confined to IamPath,
+#    each must carry the IFTerraformBoundary ceiling, and the role
+#    cannot edit that ceiling. Read the Policies block on IFTerraformRole and the
+#    boundary policy itself - between them they are the answer to this question.
 #
 #    PermissionsBoundaryArn is a separate thing: a boundary your own organisation
 #    puts on IFTerraform. IFTerraformBoundary is the ceiling we put on the roles
 #    IFTerraform creates. Both can be set, and they do not interact.
 #
 # 3. Services the role can reach. Read IFTerraformDeployPolicy: ec2, s3, kms,
-#    secretsmanager, lambda, glue, rds, elasticache, sns, scheduler, logs,
-#    cloudwatch, xray, bedrock, iam, sts and the tagging API. Nothing else in AWS
-#    is reachable at all. The list is derived from the resource types the
-#    deployment declares rather than from a completed deployment's CloudTrail, so
-#    it may prove very slightly incomplete on a first install - the failure mode is
-#    an AccessDenied part-way through an apply, not a silent gap. If that happens,
-#    set DeployPolicyArn to AdministratorAccess to get unblocked, tell us what
-#    failed, and we will correct this policy rather than leave you broad.
+#    secretsmanager, lambda, glue, rds, elasticache, sns, scheduler, logs, cloudwatch,
+#    xray, bedrock, iam, sts and the tagging API. Nothing else in AWS is reachable at
+#    all. The list is derived from the resource types the deployment declares rather
+#    than from a completed deployment's CloudTrail, so it may prove very slightly
+#    incomplete on a first install - the failure mode is an AccessDenied part-way
+#    through an apply, not a silent gap. There is no parameter to widen it with: tell
+#    us what failed and we will issue a corrected version of this template, so the
+#    change is reviewable and recorded rather than made once in your account.
 #
-# 4. One role or two. This template creates one role, matching the single
-#    deployment identity used in Azure deployments. If you would prefer the
-#    application release pipelines to hold a separate, much narrower role, able to
-#    update function code and data-processing job definitions but not to create
-#    infrastructure. Insight Factory can supply that variant. It is a larger task
-#    list for you, not a smaller one, which is why it is not the default.
+# 4. On the source-IP condition. It sits on the role-assumption call rather than on
+#    the role's permissions. That is deliberate: an IP condition on the permissions
+#    would also be evaluated when an AWS service makes a follow-on call on the role's
+#    behalf, where the caller's IP is not part of the request context, and legitimate
+#    operations would fail in ways that are hard to diagnose. Restricting the
+#    assumption is sufficient - no session can be obtained from anywhere else in the
+#    first place.
 #
-# 5. On AllowedSourceIps. The IP condition sits on the role-assumption call rather
-#    than on the role's permissions. That is deliberate: an IP condition on the
-#    permissions would also be evaluated when an AWS service makes a follow-on call
-#    on the role's behalf, where the caller's IP is not part of the request
-#    context, and legitimate operations would fail in ways that are hard to
-#    diagnose. Restricting the assumption is sufficient: no session can be
-#    obtained from anywhere else in the first place.
+#    The four addresses are the static egress of Insight Factory's release pipelines,
+#    two per region, the second region being failover. They identify "an Insight
+#    Factory CI job"; the repository and branch claim identifies the pipeline. The two
+#    are independent layers and neither replaces the other. If these addresses ever
+#    change, that is a new version of this template and a stack update for you - which
+#    is the point: our CI cannot move without you seeing it.
 #
-#    The address Insight Factory supplies is a gateway shared by its engineering
-#    organisation's automation, so it identifies "an Insight Factory CI job" rather
-#    than one specific pipeline. The repository condition identifies the pipeline.
-#    The two are independent layers; neither replaces the other.
+# 5. One role or two. This template creates one role, matching the single deployment
+#    identity used in Azure deployments. If you would prefer the application release
+#    pipelines to hold a separate, much narrower role - able to update function code
+#    and data-processing job definitions but not to create infrastructure - Insight
+#    Factory can supply that variant. It is a larger task list for you, not a smaller
+#    one, which is why it is not the default.
 #
 # 6. Revoking access. Delete this stack. Every session the automation could obtain
-#    disappears with the role, and there is no credential that outlives it. To
-#    suspend access without deleting, change the TrustedSubject condition on the
-#    role's trust policy, a change only you can make.
+#    disappears with the role, and there is no credential that outlives it. To suspend
+#    access without deleting, edit the sub condition on the role's trust policy - a
+#    change only you can make, and one we cannot undo from our side.
 # ---------------------------------------------------------------------------------
