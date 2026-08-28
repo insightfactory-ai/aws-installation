@@ -5,6 +5,21 @@ a change means a new version, never an edit to an existing one.
 
 ## Unreleased
 
+- **The trusted repository and branch are named by id, not by name.** The `sub`
+  condition is now
+  `repo:insightfactory-ai@76498963/if_sre_github_releases@1307263479:ref:refs/heads/main`,
+  where `76498963` is the `insightfactory-ai` organisation and `1307263479` is the
+  `if_sre_github_releases` repository. That is the form GitHub issues for this
+  repository, and it is the stronger of the two spellings: a name can be given up and
+  claimed by someone else, an id cannot, so a repository renamed to ours afterwards
+  still would not match. Still one exact match, never a pattern. The name-based
+  spelling is not accepted — accepting both would mean accepting a value that can
+  change hands.
+
+  **An account that deployed an earlier version needs a stack update.** Until it is
+  applied the role denies every assumption, because the value in its trust policy
+  matches nothing GitHub sends.
+
 First publication of the access stack as a downloadable, checksummed file. It was
 previously distributed inline in the installation guide, which gave no way to verify
 what you received or to say which version you had reviewed.

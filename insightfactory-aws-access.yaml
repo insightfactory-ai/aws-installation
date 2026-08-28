@@ -146,8 +146,10 @@ Resources:
                 # GitHub issued for any other service cannot be replayed here.
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
                 # sub pins it to one repository and one branch, matched exactly, not
-                # by pattern. Nothing else on GitHub can obtain a session.
-                token.actions.githubusercontent.com:sub: 'repo:insightfactory-ai/if_sre_github_releases:ref:refs/heads/main'
+                # by pattern. The organisation and the repository appear as numbers
+                # because that is the form GitHub issues: a name can be given up and
+                # claimed by someone else, an id cannot.
+                token.actions.githubusercontent.com:sub: 'repo:insightfactory-ai@76498963/if_sre_github_releases@1307263479:ref:refs/heads/main'
               # And only from Insight Factory's release pipelines. These are static
               # egress addresses: two in the primary region, two in the failover
               # region. The condition is on the assumption call, not on the role's
