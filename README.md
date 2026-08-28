@@ -48,6 +48,12 @@ The role's trust policy accepts a token only if both claims match exactly:
 - `sub` is one repository on one branch, matched exactly rather than by pattern. No
   other repository on GitHub — including our own — can obtain a session.
 
+  The value names the organisation and the repository by id — `76498963` and
+  `1307263479` — rather than by name, which is the form GitHub issues for ours. An id
+  cannot be given up and claimed by someone else the way a name can, so a repository
+  renamed to ours afterwards still would not match. The name-based spelling is not
+  accepted.
+
 And only from four addresses. Our release pipelines have static egress — two in the
 primary region, two in the failover region — and the trust policy names them, so the
 role cannot be assumed from anywhere else even if something were mis-scoped on our
