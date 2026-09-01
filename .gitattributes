@@ -1,0 +1,4 @@
+# The template is published with a SHA256, so a line-ending flip breaks the
+# checksum customers verify against. Keep the working tree LF on every platform.
+* text=auto eol=lf
+*.png binary
