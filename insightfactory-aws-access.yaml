@@ -313,6 +313,7 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - ecr:*
               - ec2:*
               - s3:*
               - kms:*
