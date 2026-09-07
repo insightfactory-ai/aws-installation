@@ -284,10 +284,11 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Sixteen services, and nothing else in AWS. The platform is storage, serverless
-  # compute, data processing, two database engines, caching, notifications,
-  # scheduling, logging and inference - so those are the services here, and the couple
-  # of hundred others are simply absent.
+  # Twenty services, and nothing else in AWS. The platform is storage, serverless
+  # compute, container orchestration behind a load balancer with an ACM certificate,
+  # data processing, two database engines, caching, notifications, scheduling,
+  # logging and inference - so those are the services here, and the couple of
+  # hundred others are simply absent.
   #
   # The grants are at service level rather than enumerated action lists. These
   # accounts hold nothing but the Insight Factory platform, so a narrower list would
@@ -315,6 +316,9 @@ Resources:
             Action:
               - ecr:*
               - ec2:*
+              - ecs:*
+              - elasticloadbalancing:*
+              - acm:*
               - s3:*
               - kms:*
               - secretsmanager:*
@@ -342,9 +346,10 @@ Resources:
   # A permissions boundary is not a grant. A role's effective permissions are the
   # intersection of what it is granted and what this policy permits, so this is the
   # complete answer to "what is the most any Insight Factory role in my account can
-  # ever do" - roughly fifteen roles per account, none of which can exceed it,
-  # whatever policy is attached to them. Statement 2 of the guardrails above refuses
-  # to create a role without it.
+  # ever do" - roughly fifteen roles per account, including the one running the
+  # platform's container service behind its load balancer and certificate, none of
+  # which can exceed it, whatever policy is attached to them. Statement 2 of the
+  # guardrails above refuses to create a role without it.
   #
   # Service level again, for the same reason. What prevents privilege escalation here
   # is the absence of iam from the list, not the precision of the entries in it.
@@ -360,12 +365,15 @@ Resources:
         Version: '2012-10-17'
         Statement:
 
-          # What the platform's roles do at runtime: storage, serverless compute, data
-          # processing, the databases, caching, notifications, scheduling, logging and
-          # tracing.
+          # What the platform's roles do at runtime: storage, serverless compute,
+          # container orchestration, data processing, the databases, caching,
+          # notifications, scheduling, logging and tracing.
           - Effect: Allow
             Action:
               - ec2:*
+              - ecr:*
+              - ecs:*
+              - application-autoscaling:*
               - s3:*
               - lambda:*
               - glue:*
@@ -413,15 +421,19 @@ Resources:
               - iam:PassRole
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role${IamPath}*'
 
-          # Databricks spot instances need the EC2 spot service-linked role, which AWS
-          # creates on first use. It is the only IAM write inside this ceiling, and the
-          # condition means it can only ever produce that one AWS-managed role.
+          # Databricks spot instances need the EC2 spot service-linked role, and
+          # Application Auto Scaling needs its own service-linked role the first time
+          # it scales an ECS service. Both are AWS-managed roles created on first use.
+          # It is the only IAM write inside this ceiling, and the condition means it
+          # can only ever produce those two roles.
           - Effect: Allow
             Action: iam:CreateServiceLinkedRole
             Resource: '*'
             Condition:
               StringLike:
-                iam:AWSServiceName: spot.amazonaws.com
+                iam:AWSServiceName:
+                  - spot.amazonaws.com
+                  - ecs.application-autoscaling.amazonaws.com
 
           # Belt and braces. A boundary is an allow-list, so everything absent from the
           # statements above is already capped out; these are written explicitly
