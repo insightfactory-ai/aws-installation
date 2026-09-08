@@ -5,6 +5,24 @@ a change means a new version, never an edit to an existing one.
 
 ## Unreleased
 
+- **`IFTerraformDeploy` and `IFTerraformBoundary` gained the services the agent-app
+  stack needs.** `ecr:*` went into the deploy policy because the platform's images
+  live in ECR, an addition already on `develop` but never carried into this
+  changelog. `elasticloadbalancing:*`, `acm:*` and `ecs:*` went into the deploy
+  policy because the platform's agent applications run on ECS behind an ALB with an
+  ACM certificate. `ecr:*`, `ecs:*` and `application-autoscaling:*` went into the
+  boundary because the roles the deployment creates for those applications push
+  images, register task definitions and scale the service. The boundary's
+  `iam:CreateServiceLinkedRole` condition now also allows
+  `ecs.application-autoscaling.amazonaws.com`, the service-linked role Application
+  Auto Scaling creates on first use, alongside the existing `spot.amazonaws.com`.
+
+  **An account on an earlier version needs a stack update before the agent-app stack
+  can apply**, because the actions above are absent from its deployed policies.
+
+- **Fixed: `SHA256SUMS` matches the template again.** The `ecr:*` addition changed
+  the file without regenerating its checksum; this release regenerates it.
+
 - **The trusted repository and branch are named by id, not by name.** The `sub`
   condition is now
   `repo:insightfactory-ai@76498963/if_sre_github_releases@1307263479:ref:refs/heads/main`,

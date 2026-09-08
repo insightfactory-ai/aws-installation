@@ -21,7 +21,7 @@ creates four things:
 |---|---|
 | `GitHubOidcProvider` | An identity provider entry telling your account to trust tokens issued by GitHub Actions. Created once per account. |
 | `IFTerraform` (IAM role) | The role our automation assumes to build and maintain the platform. No user, no key, no password. |
-| `IFTerraformDeploy` (managed policy) | The services the role may reach: sixteen of them, and nothing else in AWS. |
+| `IFTerraformDeploy` (managed policy) | The services the role may reach: twenty of them, and nothing else in AWS. |
 | `IFTerraformBoundary` (managed policy) | The ceiling on every IAM role the deployment later creates. Yours to read, and yours to tighten. |
 
 **In the normal case there is nothing to fill in.** Everything the stack trusts (the
@@ -74,11 +74,11 @@ to leak, and nothing to revoke except the role itself.
 Two independent limits, and the second holds regardless of the first.
 
 **What it can reach.** The role is attached to a policy this stack creates, covering
-the sixteen services the platform uses: `ec2`, `s3`, `kms`, `secretsmanager`,
-`lambda`, `glue`, `rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`,
-`xray`, `bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is
-absent, so the role cannot reach any of them. Read `IFTerraformDeployPolicy` in the
-template for the exact document.
+the twenty services the platform uses: `ecr`, `ec2`, `ecs`, `elasticloadbalancing`,
+`acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`, `rds`, `elasticache`, `sns`,
+`scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`, `sts`, plus the tagging
+API. Every other AWS service is absent, so the role cannot reach any of them. Read
+`IFTerraformDeployPolicy` in the template for the exact document.
 
 The grants are at service level rather than enumerated action lists. These accounts
 hold nothing but the Insight Factory platform, so a narrower list would mean you
