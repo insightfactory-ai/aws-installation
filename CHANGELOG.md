@@ -27,10 +27,10 @@ a change means a new version, never an edit to an existing one.
   checked against 90 days of CloudTrail from two live installations. 124 distinct
   actions were observed and all of them are covered.
 
-- **New optional parameter, `ResourcePrefix`.** Supply the resource-name prefix we agreed
-  with you and the role's Secrets Manager access narrows to secrets whose name begins
-  with it, instead of to any secret in the account. Leaving it empty changes nothing
-  else about the stack.
+  Secrets Manager is scoped to this account and Region but not to a name prefix. A
+  client may run more than one naming scheme, so a single prefix would not cover
+  everything it needs to, and a parameter that is right some of the time is worse than
+  none. The stack still asks for three values, all with working defaults.
 
 - **`DeployPolicyArn` becomes `DeployPolicyArns`**, listing the four. Still nothing you
   need to send us.

@@ -87,23 +87,9 @@ Parameters:
       than the platform needs fails the deployment part-way through, with resources
       already created.
 
-  ResourcePrefix:
-    Type: String
-    Default: ''
-    AllowedPattern: '^([a-z0-9][a-z0-9-]{0,30}[a-z0-9])?$'
-    ConstraintDescription: >-
-      Leave empty, or use the resource-name prefix Insight Factory agreed with you, for
-      example if-acme. Lowercase letters, numbers and hyphens.
-    Description: >-
-      Optional. The prefix every resource the deployment creates is named with. Supplying
-      it narrows the role's Secrets Manager access to secrets whose name begins with it,
-      instead of to any secret in this account. Insight Factory will tell you the value;
-      leaving it empty changes nothing else about the stack.
-
 Conditions:
   MakeOidcProvider: !Equals [!Ref CreateOidcProvider, 'Yes']
   HasBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, '']]
-  HasResourcePrefix: !Not [!Equals [!Ref ResourcePrefix, '']]
 
 Resources:
 
@@ -486,10 +472,7 @@ Resources:
               - secretsmanager:TagResource
               - secretsmanager:UntagResource
               - secretsmanager:UpdateSecret
-            Resource: !If
-              - HasResourcePrefix
-              - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ResourcePrefix}/*'
-              - !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*'
+            Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:*'
           - Sid: Databases
             Effect: Allow
             Action:

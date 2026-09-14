@@ -197,7 +197,7 @@ outputs (`OidcProviderArn`, `DeployPolicyArns` and
 
 ## Parameters
 
-Four, and each exists because your account or your organisation decides it rather
+Three, and each exists because your account or your organisation decides it rather
 than us. All three have working defaults, and the defaults are correct unless your
 organisation imposes a standard of its own.
 
@@ -206,7 +206,6 @@ organisation imposes a standard of its own.
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per identity provider, and a second attempt fails as a duplicate. |
 | `IamPath` | `/insightfactory/` | The path every role, group and policy the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or its first apply is denied. A bare `/` is refused: it would put our roles at your account root, where the policies could no longer tell ours apart from yours. |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. If your organisation requires a permissions boundary on every IAM principal, supply its ARN and it is applied to `IFTerraform`. **Tell us if you set it.** Your boundary intersects with everything the role is granted, so one narrower than the platform needs fails a deployment part-way through, with resources already created. |
-| `ResourcePrefix` | *(empty)* | Optional. The prefix every resource the deployment creates is named with, which we will tell you. Supplying it narrows the role's Secrets Manager access to secrets whose name begins with it, rather than to any secret in this account. Nothing else about the stack changes. |
 
 > `PermissionsBoundaryArn` is a boundary **your** organisation places on `IFTerraform`.
 > `IFTerraformBoundary` is the ceiling **we** place on the roles `IFTerraform` later
