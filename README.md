@@ -21,7 +21,7 @@ creates four things:
 |---|---|
 | `GitHubOidcProvider` | An identity provider entry telling your account to trust tokens issued by GitHub Actions. Created once per account. |
 | `IFTerraform` (IAM role) | The role our automation assumes to build and maintain the platform. No user, no key, no password. |
-| `IFTerraformDeploy` (managed policy) | The services the role may reach: twenty of them, and nothing else in AWS. |
+| `IFTerraformDeployIam`, `...Network`, `...Data`, `...Compute` (managed policies) | The individual actions the role may call, split by job. Four policies because one would exceed AWS's size limit for a managed policy. |
 | `IFTerraformBoundary` (managed policy) | The ceiling on every IAM role the deployment later creates. Yours to read, and yours to tighten. |
 
 **In the normal case there is nothing to fill in.** Everything the stack trusts (the
@@ -191,30 +191,29 @@ Send them to **deployments@insightfactory.ai**, and tell us which account is whi
 which are the environment accounts and which is the shared one.
 
 **Also send `IamPath` if you changed it from the default.** Our deployment must be
-configured with the same value, and will be denied by its own guardrails on the first
-apply if it is not. **And tell us if you set `PermissionsBoundaryArn`.** The remaining
-outputs (`OidcProviderArn`, `DeployPolicyArn` and
+configured with the same value, and its first apply is denied if it is not. **And tell us if you set `PermissionsBoundaryArn`.** The remaining
+outputs (`OidcProviderArn`, `DeployPolicyArns` and
 `BoundaryPolicyArn`) are for you to read. There is nothing to send for any of them.
 
 ## Parameters
 
-Three, and each exists because your account or your organisation decides it rather
+Four, and each exists because your account or your organisation decides it rather
 than us. All three have working defaults, and the defaults are correct unless your
 organisation imposes a standard of its own.
 
 | Parameter | Default | |
 |---|---|---|
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per identity provider, and a second attempt fails as a duplicate. |
-| `IamPath` | `/insightfactory/` | The path every role and group the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or it is denied by its own guardrails on the first apply. A bare `/` is refused: it would make the guardrails apply to every role in your account rather than to ours. |
+| `IamPath` | `/insightfactory/` | The path every role, group and policy the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or its first apply is denied. A bare `/` is refused: it would put our roles at your account root, where the policies could no longer tell ours apart from yours. |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. If your organisation requires a permissions boundary on every IAM principal, supply its ARN and it is applied to `IFTerraform`. **Tell us if you set it.** Your boundary intersects with everything the role is granted, so one narrower than the platform needs fails a deployment part-way through, with resources already created. |
+| `ResourcePrefix` | *(empty)* | Optional. The prefix every resource the deployment creates is named with, which we will tell you. Supplying it narrows the role's Secrets Manager access to secrets whose name begins with it, rather than to any secret in this account. Nothing else about the stack changes. |
 
 > `PermissionsBoundaryArn` is a boundary **your** organisation places on `IFTerraform`.
 > `IFTerraformBoundary` is the ceiling **we** place on the roles `IFTerraform` later
 > creates. Both can be set, and they do not interact.
 
 Everything else is fixed in the template: the trusted repository and branch, our CI
-addresses, the four-hour maximum session, and the `IFTerraformDeploy` and
-`IFTerraformBoundary` policy names. Read them in the file, which is now the only place
+addresses, the four-hour maximum session, and the policy names. Read them in the file, which is now the only place
 they can be.
 
 > **If you tighten `IFTerraformBoundary`, tell us.** Loosening it is harmless.

@@ -5,6 +5,36 @@ a change means a new version, never an edit to an existing one.
 
 ## Unreleased
 
+- **`IFTerraformDeploy` now lists individual actions instead of whole services, and the
+  role's inline deny policy is gone.** The role previously held nineteen service-level
+  grants, and what bounded it was five explicit denies layered on top. It now holds four
+  policies that between them name 316 individual actions, and nothing else is permitted,
+  so there is nothing left for a deny to subtract. The answer to "can it do X" is a
+  search of a list rather than an intersection of an allow and five denies.
+
+  Four policies rather than one because a single document would exceed the 6,144
+  character limit AWS places on a managed policy. They are split by job:
+  `IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
+  `IFTerraformDeployCompute`, and each can be read on its own.
+
+  Where the deployment's naming makes it exact, access is scoped to a resource ARN: IAM
+  roles, groups and policies to `IamPath`, and the control database connection to one
+  named database user. Where it does not, it is scoped by condition. `iam:CreateRole`
+  now carries the permissions-boundary requirement as a condition on the grant itself,
+  rather than being granted broadly and then denied without it.
+
+  The action list was taken from the resource types the deployment declares, then
+  checked against 90 days of CloudTrail from two live installations. 124 distinct
+  actions were observed and all of them are covered.
+
+- **New optional parameter, `ResourcePrefix`.** Supply the resource-name prefix we agreed
+  with you and the role's Secrets Manager access narrows to secrets whose name begins
+  with it, instead of to any secret in the account. Leaving it empty changes nothing
+  else about the stack.
+
+- **`DeployPolicyArn` becomes `DeployPolicyArns`**, listing the four. Still nothing you
+  need to send us.
+
 - **`IFTerraformDeploy` and `IFTerraformBoundary` gained the services the agent-app
   stack needs.** `ecr:*` went into the deploy policy because the platform's images
   live in ECR, an addition already on `develop` but never carried into this
