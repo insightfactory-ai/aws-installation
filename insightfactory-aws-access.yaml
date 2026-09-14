@@ -234,23 +234,33 @@ Resources:
                 Action: iam:DeleteRolePermissionsBoundary
                 Resource: '*'
 
-              # 4. And it cannot rewrite the boundary itself. Without this the whole
-              # arrangement is decorative - the role would publish a new default
+              # 4. And it cannot rewrite the policies that cap it. Without this the
+              # whole arrangement is decorative - the role would publish a new default
               # version of the policy that caps it. This is the statement that makes
-              # the two above mean anything.
+              # the two above mean anything. IFTerraformBoundary caps the roles this
+              # one creates and IFTerraformDeploy is its own grant; your boundary,
+              # named here too when you set one, caps the role itself.
               - Effect: Deny
                 Action:
                   - iam:CreatePolicyVersion
                   - iam:DeletePolicyVersion
                   - iam:SetDefaultPolicyVersion
                   - iam:DeletePolicy
-                Resource: !Ref IFTerraformBoundary
+                Resource: !If
+                  - HasBoundary
+                  - [!Ref IFTerraformBoundary, !Ref IFTerraformDeployPolicy, !Ref PermissionsBoundaryArn]
+                  - [!Ref IFTerraformBoundary, !Ref IFTerraformDeployPolicy]
 
               # 5. Account-level controls are yours alone. The role builds and
               # operates a platform; it has no business in your organisation, your
               # bill, or the audit trail that makes everything above verifiable. The
-              # IAM user and access-key denies are here so that "no users, no keys" is
-              # a property your account enforces, not a claim we make.
+              # The IAM user and credential denies are here so that the role cannot
+              # create an IAM user, mint or reactivate a credential for one, or take
+              # its MFA away. That is enforced by your account, not claimed by us.
+              #
+              # iam:AttachUserPolicy is not listed: the deployment attaches the
+              # control-database connect policy to an IAM user when you name one in
+              # control_db_deploy_principal_arns, and denying it would break that.
               - Effect: Deny
                 Action:
                   - organizations:*
@@ -271,8 +281,21 @@ Resources:
                   - config:DeleteConfigurationRecorder
                   - config:StopConfigurationRecorder
                   - iam:CreateUser
+                  - iam:DeleteUser
                   - iam:CreateAccessKey
+                  - iam:UpdateAccessKey
                   - iam:CreateLoginProfile
+                  - iam:UpdateLoginProfile
+                  - iam:PutUserPolicy
+                  - iam:PutUserPermissionsBoundary
+                  - iam:DeleteUserPermissionsBoundary
+                  - iam:CreateServiceSpecificCredential
+                  - iam:ResetServiceSpecificCredential
+                  - iam:UpdateServiceSpecificCredential
+                  - iam:UploadSSHPublicKey
+                  - iam:UpdateSSHPublicKey
+                  - iam:DeactivateMFADevice
+                  - iam:DeleteVirtualMFADevice
                   - iam:CreateSAMLProvider
                   - iam:DeleteSAMLProvider
                   - iam:UpdateAccountPasswordPolicy

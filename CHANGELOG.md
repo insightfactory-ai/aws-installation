@@ -5,6 +5,28 @@ a change means a new version, never an edit to an existing one.
 
 ## Unreleased
 
+- **The guardrail denies now name every policy that bounds the role, and extend to
+  IAM principals the deployment does not create.** Statement 4 covers
+  `IFTerraformBoundary`, `IFTerraformDeploy` and, where you supplied one, your own
+  `PermissionsBoundaryArn`. Those three policies are what bound the role, so none of
+  them is the role's to change. Statement 5 covered IAM user, access key and login
+  profile creation; it now also covers inline user policies, user permissions
+  boundaries, console password resets, service-specific credentials, SSH public keys
+  and MFA device removal, including the actions that reactivate a dormant credential
+  rather than create a new one. Together they mean the role cannot create an IAM
+  user, mint or reactivate a credential for one, or take its MFA away. That is
+  enforced by your account rather than claimed by us.
+
+  One action is deliberately absent. `iam:AttachUserPolicy` stays available because
+  the deployment attaches the control-database connect policy to an IAM user when you
+  name one in `control_db_deploy_principal_arns`. It is listed here rather than left
+  implicit, because it means the denies above bound what the role does to an IAM
+  user, not every policy that could reach one.
+
+  **Deny-only.** Nothing the deployment does loses a permission, so a stack update
+  can be applied at any time and in any order, and does not need to be sequenced
+  against a deployment run.
+
 - **`IFTerraformDeploy` and `IFTerraformBoundary` gained the services the agent-app
   stack needs.** `ecr:*` went into the deploy policy because the platform's images
   live in ECR, an addition already on `develop` but never carried into this
