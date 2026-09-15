@@ -20,10 +20,11 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 317 individual actions between them, so the answer to "can it do X" is a search
-  of a list. Four policies rather than one because a single document would exceed the
-  6,144 character limit AWS places on a managed policy; they are split by job and each
-  can be read on its own.
+  name 332 individual actions between them, each written in full: there is no asterisk
+  anywhere in the four documents, so the answer to "can it do X" is a search of a list
+  rather than a judgement about what a wildcard covers. Four policies rather than one
+  because a single document would exceed the 6,144 character limit AWS places on a
+  managed policy; they are split by job and each can be read on its own.
 
   The action list is derived from the resource types the deployment declares and
   checked against CloudTrail from live installations. A first install may still stop on

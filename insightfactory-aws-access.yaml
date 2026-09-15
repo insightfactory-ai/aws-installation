@@ -178,11 +178,12 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 317 actions, each one the deployment
-  # calls. The list is derived from the resource types the deployment declares and
-  # checked against CloudTrail from live installations. A first install may still meet
-  # an AccessDenied on an API neither source showed, which is corrected by a new
-  # version of this template rather than by widening it in your account.
+  # Enumerated actions, not service wildcards. 332 actions, each named in full, with no
+  # asterisk anywhere in the four policies. The list is derived from the resource types
+  # the deployment declares and checked against CloudTrail from live installations. A
+  # first install may still meet an AccessDenied on an API neither source showed, which
+  # is corrected by a new version of this template rather than by widening it in your
+  # account.
   #
   # Four policies because one would exceed the 6,144 character limit on a managed
   # policy. Split by job so each can be read on its own.
@@ -334,7 +335,23 @@ Resources:
         Statement:
           - Sid: ReadNetworkForPlan
             Effect: Allow
-            Action: ec2:Describe*
+            Action:
+              - ec2:DescribeAccountAttributes
+              - ec2:DescribeAddresses
+              - ec2:DescribeAddressesAttribute
+              - ec2:DescribeAvailabilityZones
+              - ec2:DescribeInternetGateways
+              - ec2:DescribeNatGateways
+              - ec2:DescribeNetworkAcls
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DescribePrefixLists
+              - ec2:DescribeRouteTables
+              - ec2:DescribeSecurityGroupRules
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcAttribute
+              - ec2:DescribeVpcEndpoints
+              - ec2:DescribeVpcs
             Resource: '*'
           - Sid: BuildTheVpc
             Effect: Allow

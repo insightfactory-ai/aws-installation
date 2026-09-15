@@ -1,4 +1,4 @@
-# Insight Factory on AWS — installation files
+# Insight Factory on AWS: installation files
 
 Setup files for deploying Insight Factory into your own AWS accounts.
 
@@ -73,53 +73,56 @@ to leak, and nothing to revoke except the role itself.
 
 Two independent limits, and the second holds regardless of the first.
 
-**What it can reach.** The role is attached to a policy this stack creates, covering
-the twenty services the platform uses: `ecr`, `ec2`, `ecs`, `elasticloadbalancing`,
-`acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`, `rds`, `elasticache`, `sns`,
-`scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`, `sts`, plus the tagging
-API. Every other AWS service is absent, so the role cannot reach any of them. Read
-`IFTerraformDeployPolicy` in the template for the exact document.
+**What it can reach.** The role is attached to four managed policies this stack
+creates, which between them name **332 individual actions**. Every action is written
+in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
+search of a list rather than a judgement about what a wildcard covers.
 
-The grants are at service level rather than enumerated action lists. These accounts
-hold nothing but the Insight Factory platform, so a narrower list would mean you
-approving a change every time the platform called a new API, without meaningfully
-changing what is reachable.
+Those actions fall inside the twenty services the platform uses: `ecr`, `ec2`, `ecs`,
+`elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`, `rds`,
+`elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`,
+`sts`, plus the tagging API. Every other AWS service is absent, and so is every action
+within those twenty that the deployment does not call. Read `IFTerraformDeployIam`,
+`IFTerraformDeployNetwork`, `IFTerraformDeployData` and `IFTerraformDeployCompute` in
+the template for the exact documents.
 
 `iam` is in that list because the deployment creates and maintains the roughly fifteen
-IAM roles the platform's own services run under. Which brings us to the second limit.
+IAM roles the platform's own services run under. Four grants bound what that means:
 
-**What it cannot do, whatever policy is attached.** The role carries a set of explicit
-denies, and in AWS an explicit deny overrides every allow. They hold whatever policy
-is attached to the role, now or in any future version of this template:
+1. **It can only touch its own identities.** Every role, group and policy the
+   deployment creates lives under `IamPath` (default `/insightfactory/`), and the IAM
+   grants are scoped to that path by resource ARN. `iam:PassRole` is scoped to it too,
+   so the role cannot hand one of your existing privileged roles to a function it
+   creates.
+2. **Every role it creates carries the boundary.** `iam:CreateRole` is allowed only
+   with `IFTerraformBoundary` as the new role's permissions boundary, as a condition on
+   the grant itself, so no role it makes can exceed that ceiling.
+3. **It can attach only its own policies, or four named AWS ones.**
+   `iam:AttachRolePolicy` is conditioned on the policy ARN: policies under `IamPath`,
+   plus `AWSLambdaBasicExecutionRole`, `AWSLambdaVPCAccessExecutionRole`,
+   `AWSGlueServiceRole` and `AWSXRayDaemonWriteAccess`.
+4. **It cannot edit its own ceiling.** The policies that bound the role, including
+   `IFTerraformBoundary`, are created at your account root, outside every scope the
+   role is granted.
 
-1. **It can only touch its own identities.** Every role and group the deployment
-   creates lives under `IamPath` (default `/insightfactory/`). All role and group
-   mutations, and `iam:PassRole`, are denied anywhere else, so the role cannot read,
-   alter or delete an identity it did not create, and cannot hand one of your existing
-   privileged roles to a function it creates.
-2. **Every role it creates must carry the boundary.** `iam:CreateRole` is denied unless
-   the new role is created with `IFTerraformBoundary` attached, so no role it makes can
-   exceed that ceiling.
-3. **It cannot remove the boundary** from a role once set.
-4. **It cannot rewrite the boundary policy.** Without this the three above would be
-   decorative, because the role could simply publish a new version of the policy that
-   caps it.
-5. **Account-level controls are yours alone.** AWS Organizations, account settings,
-   billing, CloudTrail logging, GuardDuty, Security Hub and Config are denied outright.
-   So are `iam:CreateUser` and `iam:CreateAccessKey`, which makes "no users, no keys" a
-   property your account enforces rather than a claim we make.
+`iam:CreateUser` and `iam:CreateAccessKey` are not in any of the four policies, which
+makes "no users, no keys" a property your account enforces rather than a claim we make.
 
-`IFTerraformBoundary` is the complete answer to "what is the most any Insight Factory
-role in my account can ever do". What prevents privilege escalation is the absence of
-`iam` from that policy, not the precision of the entries in it.
+**What it cannot do, whatever policy is attached.** `IFTerraformBoundary` is the
+ceiling on every IAM role the deployment creates, and it is the complete answer to
+"what is the most any Insight Factory role in my account can ever do". A boundary is an
+allow-list, so everything absent from it is capped out; what prevents privilege
+escalation is the absence of `iam` from that policy. It also denies outright the
+account-level controls a reviewer looks for: AWS Organizations, account settings,
+CloudTrail logging, GuardDuty, Security Hub and Config.
 
-**If a deployment stops on an `AccessDenied`.** The scoped policy is derived from the
-resource types the deployment declares rather than from a completed installation's
-CloudTrail, so on a first install it may prove very slightly incomplete. The failure
-mode is loud: an apply that stops part-way, not a silent gap. There is no parameter
-to widen it with: tell us what failed and we will issue a corrected version of this
-template. That keeps the change reviewable and recorded, rather than made once in your
-account and forgotten.
+**If a deployment stops on an `AccessDenied`.** The action list is derived from the
+resource types the deployment declares and checked against CloudTrail from live
+installations, so on a first install it may still prove very slightly incomplete. The
+failure mode is loud: an apply that stops part-way, not a silent gap. There is no
+parameter to widen it with: tell us what failed and we will issue a corrected version
+of this template. That keeps the change reviewable and recorded, rather than made once
+in your account and forgotten.
 
 ## Before you start
 
