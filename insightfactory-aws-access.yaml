@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 332 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 335 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -680,6 +680,7 @@ Resources:
               - ecs:RegisterTaskDefinition
               - ecs:TagResource
               - ecs:UntagResource
+              - ecs:UpdateClusterSettings
               - ecs:UpdateService
               - elasticloadbalancing:AddTags
               - elasticloadbalancing:CreateListener
@@ -696,6 +697,7 @@ Resources:
               - elasticloadbalancing:DescribeTargetGroupAttributes
               - elasticloadbalancing:DescribeTargetGroups
               - elasticloadbalancing:ModifyListener
+              - elasticloadbalancing:ModifyListenerAttributes
               - elasticloadbalancing:ModifyLoadBalancerAttributes
               - elasticloadbalancing:ModifyTargetGroup
               - elasticloadbalancing:ModifyTargetGroupAttributes
