@@ -178,17 +178,18 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. Every action here is one the deployment
-  # calls, checked against 90 days of CloudTrail from two live installations: 124
-  # distinct actions observed, all covered, nothing granted that was never called.
+  # Enumerated actions, not service wildcards. 317 actions, each one the deployment
+  # calls. The list is derived from the resource types the deployment declares and
+  # checked against CloudTrail from live installations. A first install may still meet
+  # an AccessDenied on an API neither source showed, which is corrected by a new
+  # version of this template rather than by widening it in your account.
   #
   # Four policies because one would exceed the 6,144 character limit on a managed
   # policy. Split by job so each can be read on its own.
   #
   # Scoping is by resource ARN where the deployment's naming makes it exact, and by
   # condition where it does not. iam:CreateRole carries the boundary requirement as a
-  # condition rather than being allowed and then denied, which is why this role no
-  # longer needs an inline deny policy at all.
+  # condition on the grant itself, so a role cannot be created without it.
   # -------------------------------------------------------------------------------
   IFTerraformDeployIam:
     Type: AWS::IAM::ManagedPolicy
@@ -670,6 +671,7 @@ Resources:
               - elasticloadbalancing:DeleteListener
               - elasticloadbalancing:DeleteLoadBalancer
               - elasticloadbalancing:DeleteTargetGroup
+              - elasticloadbalancing:DescribeListenerAttributes
               - elasticloadbalancing:DescribeListeners
               - elasticloadbalancing:DescribeLoadBalancerAttributes
               - elasticloadbalancing:DescribeLoadBalancers
@@ -848,9 +850,8 @@ Outputs:
 #
 # 3. What the role can call. Read the four IFTerraformDeploy* policies. They list
 #    individual actions rather than whole services, so the answer to "can it do X" is
-#    a search rather than a judgement. The list was taken from the resource types the
-#    deployment declares and then checked against 90 days of CloudTrail from two live
-#    installations: 124 distinct actions were observed and all of them appear here.
+#    a search rather than a judgement. The list is derived from the resource types the
+#    deployment declares and checked against CloudTrail from live installations.
 #    A first install may still meet an AccessDenied part-way through an apply if it
 #    reaches an API neither source showed. There is no parameter to widen it with:
 #    tell us what failed and we will issue a corrected version of this template, so
