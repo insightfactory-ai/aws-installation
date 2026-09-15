@@ -97,7 +97,7 @@ IAM roles the platform's own services run under. Four grants bound what that mea
 2. **Every role it creates carries the boundary.** `iam:CreateRole` is allowed only
    with `IFTerraformBoundary` as the new role's permissions boundary, as a condition on
    the grant itself, so no role it makes can exceed that ceiling.
-3. **It can attach only its own policies, or four named AWS ones.**
+3. **It can attach only its own policies, or five named AWS ones.**
    `iam:AttachRolePolicy` is conditioned on the policy ARN: policies under `IamPath`,
    plus `AWSLambdaBasicExecutionRole`, `AWSLambdaVPCAccessExecutionRole`,
    `AWSGlueServiceRole` and `AWSXRayDaemonWriteAccess`.

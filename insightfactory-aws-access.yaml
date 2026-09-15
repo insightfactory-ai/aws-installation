@@ -238,6 +238,7 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
                   - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
                   - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSGlueServiceRole'
+                  - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
                   - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess'
           - Sid: PassOurRolesOnlyToTheServicesThatRunThem
             Effect: Allow
@@ -858,7 +859,7 @@ Outputs:
 #    attach a policy to it could otherwise create an administrator and assume it, so
 #    three conditions sit on the grant itself. iam:CreateRole is permitted only for a
 #    role under IamPath and only when it carries the IFTerraformBoundary ceiling.
-#    iam:AttachRolePolicy is permitted only for policies under IamPath and four named
+#    iam:AttachRolePolicy is permitted only for policies under IamPath and five named
 #    AWS-managed ones. And the policies that bound the role, including the boundary,
 #    are created at the account root, outside every scope granted here, so the role
 #    cannot edit its own ceiling. Read IFTerraformDeployIam and the boundary policy.
