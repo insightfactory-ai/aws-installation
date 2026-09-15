@@ -100,7 +100,8 @@ IAM roles the platform's own services run under. Four grants bound what that mea
 3. **It can attach only its own policies, or five named AWS ones.**
    `iam:AttachRolePolicy` is conditioned on the policy ARN: policies under `IamPath`,
    plus `AWSLambdaBasicExecutionRole`, `AWSLambdaVPCAccessExecutionRole`,
-   `AWSGlueServiceRole` and `AWSXRayDaemonWriteAccess`.
+   `AWSGlueServiceRole`, `AmazonECSTaskExecutionRolePolicy` and
+   `AWSXRayDaemonWriteAccess`.
 4. **It cannot edit its own ceiling.** The policies that bound the role, including
    `IFTerraformBoundary`, are created at your account root, outside every scope the
    role is granted.
