@@ -14,7 +14,7 @@ reviewed, without needing an account or asking us for access.
 
 ## What you deploy
 
-`insightfactory-aws-access.yaml` is about 530 lines, with no external dependencies. It
+`insightfactory-aws-access.yaml` is about 900 lines, with no external dependencies. It
 creates four things:
 
 | Resource | What it is |
@@ -74,7 +74,7 @@ to leak, and nothing to revoke except the role itself.
 Two independent limits, and the second holds regardless of the first.
 
 **What it can reach.** The role is attached to four managed policies this stack
-creates, which between them name **335 individual actions**. Every action is written
+creates, which between them name **333 individual actions**. Every action is written
 in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
 search of a list rather than a judgement about what a wildcard covers.
 
