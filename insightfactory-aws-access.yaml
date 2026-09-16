@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 333 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 340 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -352,6 +352,7 @@ Resources:
               - ec2:DescribeSubnets
               - ec2:DescribeVpcAttribute
               - ec2:DescribeVpcEndpoints
+              - ec2:DescribeVpcPeeringConnections
               - ec2:DescribeVpcs
             Resource: '*'
           - Sid: BuildTheVpc
@@ -382,6 +383,17 @@ Resources:
               - ec2:ModifyVpcAttribute
               - ec2:ModifyVpcEndpoint
               - ec2:ReleaseAddress
+              - ec2:ReplaceRoute
+            Resource: '*'
+          # A peering carries no traffic until a route table entry and a security group rule name the far side
+          - Sid: PeerWithTheInsightFactoryNetwork
+            Effect: Allow
+            Action:
+              - ec2:AcceptVpcPeeringConnection
+              - ec2:CreateVpcPeeringConnection
+              - ec2:DeleteVpcPeeringConnection
+              - ec2:ModifyVpcPeeringConnectionOptions
+              - ec2:RejectVpcPeeringConnection
             Resource: '*'
           - Sid: ManageSecurityGroups
             Effect: Allow
