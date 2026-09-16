@@ -302,15 +302,17 @@ Resources:
               - iam:TagOpenIDConnectProvider
               - iam:UpdateOpenIDConnectProviderThumbprint
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/*'
-          - Sid: ServiceLinkedRolesForSpotAndEcs
+          - Sid: ServiceLinkedRolesForTheServicesUsedHere
             Effect: Allow
             Action: iam:CreateServiceLinkedRole
             Resource: '*'
             Condition:
               StringEquals:
                 iam:AWSServiceName:
-                  - spot.amazonaws.com
                   - ecs.amazonaws.com
+                  - elasticloadbalancing.amazonaws.com
+                  - rds.amazonaws.com
+                  - spot.amazonaws.com
           - Sid: ReadIamForPlan
             Effect: Allow
             Action:
