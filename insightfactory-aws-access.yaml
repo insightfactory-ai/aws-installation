@@ -693,6 +693,7 @@ Resources:
               - ecs:RegisterTaskDefinition
               - ecs:TagResource
               - ecs:UntagResource
+              - ecs:UpdateClusterSettings
               - ecs:UpdateCluster
               - ecs:UpdateService
               - elasticloadbalancing:AddTags
@@ -710,6 +711,7 @@ Resources:
               - elasticloadbalancing:DescribeTargetGroupAttributes
               - elasticloadbalancing:DescribeTargetGroups
               - elasticloadbalancing:ModifyListener
+              - elasticloadbalancing:ModifyListenerAttributes
               - elasticloadbalancing:ModifyLoadBalancerAttributes
               - elasticloadbalancing:ModifyTargetGroup
               - elasticloadbalancing:ModifyTargetGroupAttributes
