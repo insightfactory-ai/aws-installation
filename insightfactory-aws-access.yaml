@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 377 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 378 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -567,6 +567,7 @@ Resources:
               - rds:DescribeDBParameters
               - rds:DescribeDBSnapshots
               - rds:DescribeDBSubnetGroups
+              - rds:DescribeGlobalClusters
               - rds:DescribeOrderableDBInstanceOptions
               - rds:ListTagsForResource
               - rds:ModifyDBCluster
