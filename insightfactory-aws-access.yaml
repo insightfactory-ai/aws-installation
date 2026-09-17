@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 342 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 365 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -394,6 +394,35 @@ Resources:
               - ec2:DeleteVpcPeeringConnection
               - ec2:ModifyVpcPeeringConnectionOptions
               - ec2:RejectVpcPeeringConnection
+            Resource: '*'
+          # Sharing the control database with the Insight Factory network that runs the
+          # platform API. Only the database is reachable through it, and only inbound
+          - Sid: ShareTheControlDatabase
+            Effect: Allow
+            Action:
+              - ram:AssociateResourceShare
+              - ram:CreateResourceShare
+              - ram:DeleteResourceShare
+              - ram:DisassociateResourceShare
+              - ram:GetResourceShareAssociations
+              - ram:GetResourceShares
+              - ram:ListResourceSharePermissions
+              - ram:TagResource
+              - ram:UntagResource
+              - ram:UpdateResourceShare
+              - vpc-lattice:CreateResourceConfiguration
+              - vpc-lattice:CreateResourceGateway
+              - vpc-lattice:DeleteResourceConfiguration
+              - vpc-lattice:DeleteResourceGateway
+              - vpc-lattice:GetResourceConfiguration
+              - vpc-lattice:GetResourceGateway
+              - vpc-lattice:ListResourceConfigurations
+              - vpc-lattice:ListResourceGateways
+              - vpc-lattice:ListTagsForResource
+              - vpc-lattice:TagResource
+              - vpc-lattice:UntagResource
+              - vpc-lattice:UpdateResourceConfiguration
+              - vpc-lattice:UpdateResourceGateway
             Resource: '*'
           - Sid: ManageSecurityGroups
             Effect: Allow
