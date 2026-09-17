@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 365 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 376 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -543,14 +543,23 @@ Resources:
             Effect: Allow
             Action:
               - rds:AddTagsToResource
+              - rds:CreateDBCluster
+              - rds:CreateDBClusterParameterGroup
+              - rds:CreateDBClusterSnapshot
               - rds:CreateDBInstance
               - rds:CreateDBParameterGroup
               - rds:CreateDBSnapshot
               - rds:CreateDBSubnetGroup
+              - rds:DeleteDBCluster
+              - rds:DeleteDBClusterParameterGroup
               - rds:DeleteDBInstance
               - rds:DeleteDBParameterGroup
               - rds:DeleteDBSnapshot
               - rds:DeleteDBSubnetGroup
+              - rds:DescribeDBClusterParameterGroups
+              - rds:DescribeDBClusterParameters
+              - rds:DescribeDBClusters
+              - rds:DescribeDBClusterSnapshots
               - rds:DescribeDBEngineVersions
               - rds:DescribeDBInstances
               - rds:DescribeDBParameterGroups
@@ -559,6 +568,8 @@ Resources:
               - rds:DescribeDBSubnetGroups
               - rds:DescribeOrderableDBInstanceOptions
               - rds:ListTagsForResource
+              - rds:ModifyDBCluster
+              - rds:ModifyDBClusterParameterGroup
               - rds:ModifyDBInstance
               - rds:ModifyDBParameterGroup
               - rds:ModifyDBSubnetGroup
