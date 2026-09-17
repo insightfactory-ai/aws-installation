@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 378 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 386 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -408,12 +408,17 @@ Resources:
             Effect: Allow
             Action:
               - ram:AssociateResourceShare
+              - ram:AssociateResourceSharePermission
               - ram:CreateResourceShare
               - ram:DeleteResourceShare
               - ram:DisassociateResourceShare
+              - ram:GetPermission
               - ram:GetResourceShareAssociations
               - ram:GetResourceShares
+              - ram:ListPermissions
+              - ram:ListPrincipals
               - ram:ListResourceSharePermissions
+              - ram:ListResources
               - ram:TagResource
               - ram:UntagResource
               - ram:UpdateResourceShare
@@ -421,11 +426,14 @@ Resources:
               - vpc-lattice:CreateResourceGateway
               - vpc-lattice:DeleteResourceConfiguration
               - vpc-lattice:DeleteResourceGateway
+              - vpc-lattice:DeleteResourcePolicy
               - vpc-lattice:GetResourceConfiguration
               - vpc-lattice:GetResourceGateway
+              - vpc-lattice:GetResourcePolicy
               - vpc-lattice:ListResourceConfigurations
               - vpc-lattice:ListResourceGateways
               - vpc-lattice:ListTagsForResource
+              - vpc-lattice:PutResourcePolicy
               - vpc-lattice:TagResource
               - vpc-lattice:UntagResource
               - vpc-lattice:UpdateResourceConfiguration
