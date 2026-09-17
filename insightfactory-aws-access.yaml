@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 376 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 377 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -384,6 +384,7 @@ Resources:
               - ec2:DeleteVpc
               - ec2:DeleteVpcEndpoints
               - ec2:DetachInternetGateway
+              - ec2:DisassociateAddress
               - ec2:DisassociateRouteTable
               - ec2:ModifySubnetAttribute
               - ec2:ModifyVpcAttribute
