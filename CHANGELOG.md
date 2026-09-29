@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 342 individual actions between them, each written in full: there is no asterisk
+  name 350 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -104,10 +104,10 @@ against `SHA256SUMS` in this repository.
 
 ### Services covered
 
-The four deploy policies cover the twenty services the platform uses: `ecr`, `ec2`,
+The four deploy policies cover the twenty-one services the platform uses: `ecr`, `ec2`,
 `ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
-`rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
-`iam`, `sts`, plus the tagging API. Every other AWS service is absent.
+`rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`,
+`bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is absent.
 
 `ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's agent
 applications run on ECS behind an ALB with an ACM certificate. `IFTerraformBoundary`
@@ -115,6 +115,11 @@ carries `ecr`, `ecs` and `application-autoscaling` because the roles the deploym
 creates for those applications push images, register task definitions and scale the
 service, and its `iam:CreateServiceLinkedRole` condition allows
 `ecs.application-autoscaling.amazonaws.com` and `spot.amazonaws.com`.
+
+`sqs` is there because each environment's task-run events reach the platform's API
+through a queue in the shared account. `IFTerraformBoundary` carries it because the
+function that sends them runs under a role the deployment creates. The queue actions are
+confined to queues in the account and region the stack is deployed in.
 
 ### If you deployed a pre-release copy
 

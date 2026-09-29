@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 342 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 350 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -570,7 +570,7 @@ Resources:
     Properties:
       ManagedPolicyName: IFTerraformDeployCompute
       Description: >-
-        Functions, containers, schedules, logs, alarms and notifications.
+        Functions, containers, schedules, logs, alarms, notifications and queues.
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -652,6 +652,18 @@ Resources:
               - sns:Unsubscribe
               - sns:UntagResource
             Resource: '*'
+          - Sid: Queues
+            Effect: Allow
+            Action:
+              - sqs:CreateQueue
+              - sqs:DeleteQueue
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ListQueueTags
+              - sqs:SetQueueAttributes
+              - sqs:TagQueue
+              - sqs:UntagQueue
+            Resource: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:*'
           - Sid: ContainerImages
             Effect: Allow
             Action:
@@ -737,7 +749,7 @@ Resources:
 
           # What the platform's roles do at runtime: storage, serverless compute,
           # container orchestration, data processing, the databases, caching,
-          # notifications, scheduling, logging and tracing.
+          # notifications, queues, scheduling, logging and tracing.
           - Effect: Allow
             Action:
               - ec2:*
@@ -752,6 +764,7 @@ Resources:
               - elasticache:*
               - secretsmanager:*
               - sns:*
+              - sqs:*
               - scheduler:*
               - logs:*
               - cloudwatch:*

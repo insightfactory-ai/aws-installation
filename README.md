@@ -74,17 +74,17 @@ to leak, and nothing to revoke except the role itself.
 Two independent limits, and the second holds regardless of the first.
 
 **What it can reach.** The role is attached to four managed policies this stack
-creates, which between them name **342 individual actions**. Every action is written
+creates, which between them name **350 individual actions**. Every action is written
 in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
 search of a list rather than a judgement about what a wildcard covers.
 
-Those actions fall inside the twenty services the platform uses: `ecr`, `ec2`, `ecs`,
-`elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`, `rds`,
-`elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`,
-`sts`, plus the tagging API. Every other AWS service is absent, and so is every action
-within those twenty that the deployment does not call. Read `IFTerraformDeployIam`,
-`IFTerraformDeployNetwork`, `IFTerraformDeployData` and `IFTerraformDeployCompute` in
-the template for the exact documents.
+Those actions fall inside the twenty-one services the platform uses: `ecr`, `ec2`,
+`ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
+`rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`,
+`bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is absent, and so
+is every action within those twenty-one that the deployment does not call. Read
+`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
+`IFTerraformDeployCompute` in the template for the exact documents.
 
 `iam` is in that list because the deployment creates and maintains the roughly fifteen
 IAM roles the platform's own services run under. Four grants bound what that means:
