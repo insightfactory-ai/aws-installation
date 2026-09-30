@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 350 individual actions between them, each written in full: there is no asterisk
+  name 349 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -117,9 +117,9 @@ service, and its `iam:CreateServiceLinkedRole` condition allows
 `ecs.application-autoscaling.amazonaws.com` and `spot.amazonaws.com`.
 
 `sqs` is there because each environment's task-run events reach the platform's API
-through a queue in the shared account. `IFTerraformBoundary` carries it because the
-function that sends them runs under a role the deployment creates. The queue actions are
-confined to queues in the account and region the stack is deployed in.
+through a queue in the environment's own account. `IFTerraformBoundary` carries it
+because the function that sends them runs under a role the deployment creates. The queue
+actions are confined to queues in the account and region the stack is deployed in.
 
 ### If you deployed a pre-release copy
 
