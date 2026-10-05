@@ -178,7 +178,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 386 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 396 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -726,6 +726,23 @@ Resources:
               - ecr:TagResource
               - ecr:UntagResource
             Resource: '*'
+          # A release pushes the web application's and the schema deploy's images to this
+          # account's registries, with AWS's documented set of push actions.
+          - Sid: PushImages
+            Effect: Allow
+            Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+          # Signing in to the registry takes no resource ARN.
+          - Sid: SignInToTheRegistry
+            Effect: Allow
+            Action: ecr:GetAuthorizationToken
+            Resource: '*'
           - Sid: AgentAppServices
             Effect: Allow
             Action:
@@ -775,6 +792,21 @@ Resources:
               - elasticloadbalancing:SetSecurityGroups
               - elasticloadbalancing:SetSubnets
             Resource: '*'
+          # The control database has no public endpoint, so a release deploys its schema
+          # from a task inside the VPC: it starts the task and waits for it to stop.
+          - Sid: RunTheSchemaDeploy
+            Effect: Allow
+            Action:
+              - ecs:DescribeTasks
+              - ecs:RunTask
+            Resource: '*'
+          # A failed deploy says why only in its container's log. Reading stops at /ecs/,
+          # where this deployment's containers write, so the account's other logs stay out
+          # of reach.
+          - Sid: ReadContainerLogs
+            Effect: Allow
+            Action: logs:GetLogEvents
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/*'
           - Sid: WhoAmI
             Effect: Allow
             Action: sts:GetCallerIdentity

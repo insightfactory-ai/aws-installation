@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 386 individual actions between them, each written in full: there is no asterisk
+  name 396 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -76,6 +76,10 @@ against `SHA256SUMS` in this repository.
   everything the deployment needs, and a parameter that is right some of the time is
   worse than none.
 
+- **Logs are readable only under `/ecs/`**, where the deployment's containers write.
+  A release reads a failed schema deploy's output there; the rest of the account's logs
+  stay out of reach.
+
 ### Parameters and outputs
 
 - **Three parameters, all with working defaults**, and each because your account or
@@ -111,8 +115,12 @@ The four deploy policies cover the twenty-two services the platform uses: `ecr`,
 service is absent. `vpc-lattice` and `ram` are there because the control database is
 shared over PrivateLink rather than given a public endpoint.
 
-`ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's agent
-applications run on ECS behind an ALB with an ACM certificate. `IFTerraformBoundary`
+`ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's web
+application and agent applications run on ECS behind an ALB with an ACM certificate.
+A release pushes the web application's image to the account's own registry, and runs
+the control database's schema deploy as a task, since the database has no public
+endpoint; so the role may also push images, run and describe tasks, and read container
+logs. `IFTerraformBoundary`
 carries `ecr`, `ecs` and `application-autoscaling` because the roles the deployment
 creates for those applications push images, register task definitions and scale the
 service, and its `iam:CreateServiceLinkedRole` condition allows
