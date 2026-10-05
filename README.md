@@ -78,13 +78,13 @@ creates, which between them name **386 individual actions**. Every action is wri
 in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
 search of a list rather than a judgement about what a wildcard covers.
 
-Those actions fall inside the twenty services the platform uses: `ecr`, `ec2`, `ecs`,
-`elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`, `rds`,
-`elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`, `iam`,
-`sts`, plus the tagging API. Every other AWS service is absent, and so is every action
-within those twenty that the deployment does not call. Read `IFTerraformDeployIam`,
-`IFTerraformDeployNetwork`, `IFTerraformDeployData` and `IFTerraformDeployCompute` in
-the template for the exact documents.
+Those actions fall inside the twenty-two services the platform uses: `ecr`, `ec2`,
+`ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
+`rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
+`vpc-lattice`, `ram`, `iam`, `sts`, plus the tagging API. Every other AWS service is
+absent, and so is every action within those twenty-two that the deployment does not
+call. Read `IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData`
+and `IFTerraformDeployCompute` in the template for the exact documents.
 
 `iam` is in that list because the deployment creates and maintains the roughly fifteen
 IAM roles the platform's own services run under. Four grants bound what that means:

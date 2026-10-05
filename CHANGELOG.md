@@ -104,10 +104,12 @@ against `SHA256SUMS` in this repository.
 
 ### Services covered
 
-The four deploy policies cover the twenty services the platform uses: `ecr`, `ec2`,
-`ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
-`rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
-`iam`, `sts`, plus the tagging API. Every other AWS service is absent.
+The four deploy policies cover the twenty-two services the platform uses: `ecr`,
+`ec2`, `ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`,
+`glue`, `rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`,
+`bedrock`, `vpc-lattice`, `ram`, `iam`, `sts`, plus the tagging API. Every other AWS
+service is absent. `vpc-lattice` and `ram` are there because the control database is
+shared over PrivateLink rather than given a public endpoint.
 
 `ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's agent
 applications run on ECS behind an ALB with an ACM certificate. `IFTerraformBoundary`
