@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 342 individual actions between them, each written in full: there is no asterisk
+  name 372 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -76,9 +76,13 @@ against `SHA256SUMS` in this repository.
   everything the deployment needs, and a parameter that is right some of the time is
   worse than none.
 
+- **Logs are readable only under `/ecs/`**, where the deployment's containers write.
+  A release reads a failed schema deploy's output there; the rest of the account's logs
+  stay out of reach.
+
 ### Parameters and outputs
 
-- **Three parameters, all with working defaults**, and each because your account or
+- **Four parameters, all with working defaults**, and each because your account or
   your organisation decides it rather than us. `CreateOidcProvider`, because an AWS
   account holds one entry per identity provider and only your account state can say
   whether something already trusts GitHub Actions. `IamPath`, because IAM naming
@@ -87,6 +91,9 @@ against `SHA256SUMS` in this repository.
   that requires a boundary on every IAM principal would otherwise hit a generic SCP
   denial on `CreateRole` that does not say why; it takes an `AllowedPattern`, so a
   value that is not a policy ARN is refused at stack-creation time.
+  `InsightFactoryAccess`, `Enabled` by default, because whether our automation may
+  deploy right now is yours to decide: `Disabled` turns the role's trust policy into a
+  deny without deleting anything, and the platform keeps running.
 
   Everything else is fixed in the template: the trusted repository and branch, our CI
   addresses, the maximum session length and the policy names. Each has exactly one
@@ -104,17 +111,26 @@ against `SHA256SUMS` in this repository.
 
 ### Services covered
 
-The four deploy policies cover the twenty services the platform uses: `ecr`, `ec2`,
-`ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
-`rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
-`iam`, `sts`, plus the tagging API. Every other AWS service is absent.
+The four deploy policies cover the twenty-one services the platform uses: `ecr`,
+`ec2`, `ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`,
+`glue`, `rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`,
+`bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is absent.
 
-`ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's agent
-applications run on ECS behind an ALB with an ACM certificate. `IFTerraformBoundary`
+`ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's web
+application and agent applications run on ECS behind an ALB with an ACM certificate.
+A release pushes the web application's image to the account's own registry, and runs
+the control database's schema deploy as a task, since the database has no public
+endpoint; so the role may also push images, run and describe tasks, and read container
+logs. `IFTerraformBoundary`
 carries `ecr`, `ecs` and `application-autoscaling` because the roles the deployment
 creates for those applications push images, register task definitions and scale the
 service, and its `iam:CreateServiceLinkedRole` condition allows
 `ecs.application-autoscaling.amazonaws.com` and `spot.amazonaws.com`.
+
+`sqs` is there because each environment's task-run events reach the platform's API
+through a queue in the environment's own account. `IFTerraformBoundary` carries it
+because the function that sends them runs under a role the deployment creates. The queue
+actions are confined to queues in the account and region the stack is deployed in.
 
 ### If you deployed a pre-release copy
 

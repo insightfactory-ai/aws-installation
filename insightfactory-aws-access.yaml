@@ -87,9 +87,25 @@ Parameters:
       than the platform needs fails the deployment part-way through, with resources
       already created.
 
+  # And this one is the switch for our access. Disabled turns the role's trust policy
+  # into a deny, so no new session can be obtained, while every resource stays in place:
+  # the platform the deployment built keeps running, because nothing it runs uses
+  # IFTerraform. Set it back to Enabled for the next release. A stack update either way,
+  # so the change is recorded and the stack never drifts from the file you reviewed.
+  InsightFactoryAccess:
+    Type: String
+    AllowedValues: ['Enabled', 'Disabled']
+    Default: 'Enabled'
+    Description: >-
+      Enabled lets Insight Factory's release automation assume IFTerraform. Disabled
+      refuses every new session without deleting anything. Sessions already issued last
+      until they expire (at most four hours); use Revoke active sessions on the role to
+      end them at once.
+
 Conditions:
   MakeOidcProvider: !Equals [!Ref CreateOidcProvider, 'Yes']
   HasBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, '']]
+  AccessEnabled: !Equals [!Ref InsightFactoryAccess, 'Enabled']
 
 Resources:
 
@@ -139,7 +155,9 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          # Deny when InsightFactoryAccess is Disabled. The conditions below are the only
+          # tokens this statement could ever allow, so denying them leaves no way in.
+          - Effect: !If [AccessEnabled, Allow, Deny]
             Principal:
               Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
             Action: sts:AssumeRoleWithWebIdentity
@@ -178,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 342 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 372 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -302,15 +320,20 @@ Resources:
               - iam:TagOpenIDConnectProvider
               - iam:UpdateOpenIDConnectProviderThumbprint
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/*'
-          - Sid: ServiceLinkedRolesForSpotAndEcs
+          # An account that has never held one of these has no service-linked role for
+          # it, and the first create makes one. The condition names every service the
+          # deployment uses, so no other role can be produced here.
+          - Sid: ServiceLinkedRolesForTheServicesUsedHere
             Effect: Allow
             Action: iam:CreateServiceLinkedRole
             Resource: '*'
             Condition:
               StringEquals:
                 iam:AWSServiceName:
-                  - spot.amazonaws.com
                   - ecs.amazonaws.com
+                  - elasticloadbalancing.amazonaws.com
+                  - rds.amazonaws.com
+                  - spot.amazonaws.com
           - Sid: ReadIamForPlan
             Effect: Allow
             Action:
@@ -378,6 +401,7 @@ Resources:
               - ec2:DeleteVpc
               - ec2:DeleteVpcEndpoints
               - ec2:DetachInternetGateway
+              - ec2:DisassociateAddress
               - ec2:DisassociateRouteTable
               - ec2:ModifySubnetAttribute
               - ec2:ModifyVpcAttribute
@@ -508,22 +532,34 @@ Resources:
             Effect: Allow
             Action:
               - rds:AddTagsToResource
+              - rds:CreateDBCluster
+              - rds:CreateDBClusterParameterGroup
+              - rds:CreateDBClusterSnapshot
               - rds:CreateDBInstance
               - rds:CreateDBParameterGroup
               - rds:CreateDBSnapshot
               - rds:CreateDBSubnetGroup
+              - rds:DeleteDBCluster
+              - rds:DeleteDBClusterParameterGroup
               - rds:DeleteDBInstance
               - rds:DeleteDBParameterGroup
               - rds:DeleteDBSnapshot
               - rds:DeleteDBSubnetGroup
+              - rds:DescribeDBClusterParameterGroups
+              - rds:DescribeDBClusterParameters
+              - rds:DescribeDBClusters
+              - rds:DescribeDBClusterSnapshots
               - rds:DescribeDBEngineVersions
               - rds:DescribeDBInstances
               - rds:DescribeDBParameterGroups
               - rds:DescribeDBParameters
               - rds:DescribeDBSnapshots
               - rds:DescribeDBSubnetGroups
+              - rds:DescribeGlobalClusters
               - rds:DescribeOrderableDBInstanceOptions
               - rds:ListTagsForResource
+              - rds:ModifyDBCluster
+              - rds:ModifyDBClusterParameterGroup
               - rds:ModifyDBInstance
               - rds:ModifyDBParameterGroup
               - rds:ModifyDBSubnetGroup
@@ -570,7 +606,7 @@ Resources:
     Properties:
       ManagedPolicyName: IFTerraformDeployCompute
       Description: >-
-        Functions, containers, schedules, logs, alarms and notifications.
+        Functions, containers, schedules, logs, alarms, notifications and queues.
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -652,6 +688,17 @@ Resources:
               - sns:Unsubscribe
               - sns:UntagResource
             Resource: '*'
+          - Sid: Queues
+            Effect: Allow
+            Action:
+              - sqs:CreateQueue
+              - sqs:DeleteQueue
+              - sqs:GetQueueAttributes
+              - sqs:ListQueueTags
+              - sqs:SetQueueAttributes
+              - sqs:TagQueue
+              - sqs:UntagQueue
+            Resource: !Sub 'arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:*'
           - Sid: ContainerImages
             Effect: Allow
             Action:
@@ -669,6 +716,23 @@ Resources:
               - ecr:SetRepositoryPolicy
               - ecr:TagResource
               - ecr:UntagResource
+            Resource: '*'
+          # A release pushes the web application's and the schema deploy's images to this
+          # account's registries, with AWS's documented set of push actions.
+          - Sid: PushImages
+            Effect: Allow
+            Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+          # Signing in to the registry takes no resource ARN.
+          - Sid: SignInToTheRegistry
+            Effect: Allow
+            Action: ecr:GetAuthorizationToken
             Resource: '*'
           - Sid: AgentAppServices
             Effect: Allow
@@ -719,6 +783,21 @@ Resources:
               - elasticloadbalancing:SetSecurityGroups
               - elasticloadbalancing:SetSubnets
             Resource: '*'
+          # The control database has no public endpoint, so a release deploys its schema
+          # from a task inside the VPC: it starts the task and waits for it to stop.
+          - Sid: RunTheSchemaDeploy
+            Effect: Allow
+            Action:
+              - ecs:DescribeTasks
+              - ecs:RunTask
+            Resource: '*'
+          # A failed deploy says why only in its container's log. Reading stops at /ecs/,
+          # where this deployment's containers write, so the account's other logs stay out
+          # of reach.
+          - Sid: ReadContainerLogs
+            Effect: Allow
+            Action: logs:GetLogEvents
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/*'
           - Sid: WhoAmI
             Effect: Allow
             Action: sts:GetCallerIdentity
@@ -737,7 +816,7 @@ Resources:
 
           # What the platform's roles do at runtime: storage, serverless compute,
           # container orchestration, data processing, the databases, caching,
-          # notifications, scheduling, logging and tracing.
+          # notifications, queues, scheduling, logging and tracing.
           - Effect: Allow
             Action:
               - ec2:*
@@ -752,6 +831,7 @@ Resources:
               - elasticache:*
               - secretsmanager:*
               - sns:*
+              - sqs:*
               - scheduler:*
               - logs:*
               - cloudwatch:*
@@ -921,8 +1001,11 @@ Outputs:
 #    Factory can supply that variant. It is a larger task list for you, not a smaller
 #    one, which is why it is not the default.
 #
-# 7. Revoking access. Delete this stack. Every session the automation could obtain
-#    disappears with the role, and there is no credential that outlives it. To suspend
-#    access without deleting, edit the sub condition on the role's trust policy - a
-#    change only you can make, and one we cannot undo from our side.
+# 7. Revoking access. To suspend it, update the stack with InsightFactoryAccess set to
+#    Disabled: the trust policy becomes a deny, nothing is deleted, and the platform
+#    keeps running. Set it back to Enabled for the next release. To end sessions already
+#    issued at once, use Revoke active sessions on the role. To remove access entirely,
+#    delete this stack: every session the automation could obtain disappears with the
+#    role, and there is no credential that outlives it. Either change is yours alone;
+#    we cannot undo it from our side.
 # ---------------------------------------------------------------------------------
