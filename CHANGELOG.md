@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 403 individual actions between them, each written in full: there is no asterisk
+  name 372 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -111,12 +111,10 @@ against `SHA256SUMS` in this repository.
 
 ### Services covered
 
-The four deploy policies cover the twenty-three services the platform uses: `ecr`,
+The four deploy policies cover the twenty-one services the platform uses: `ecr`,
 `ec2`, `ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`,
 `glue`, `rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`,
-`bedrock`, `vpc-lattice`, `ram`, `iam`, `sts`, plus the tagging API. Every other AWS
-service is absent. `vpc-lattice` and `ram` are there because the control database is
-shared over PrivateLink rather than given a public endpoint.
+`bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is absent.
 
 `ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's web
 application and agent applications run on ECS behind an ALB with an ACM certificate.
