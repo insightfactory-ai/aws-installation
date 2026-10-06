@@ -873,10 +873,16 @@ Resources:
           # The Databricks integration requires several of these roles to assume
           # themselves. Confined to the path, so no boundaried role can assume
           # anything of yours even if something granted it permission to try.
+          #
+          # Assuming reaches the path in any account, because the web application reads
+          # the other environments' control databases, and the shared PostgreSQL, through
+          # a role in that database's account. Which roles it may actually assume is set
+          # by its own policy, exact ARNs, and by each target's trust policy.
           - Effect: Allow
-            Action:
-              - sts:AssumeRole
-              - iam:PassRole
+            Action: sts:AssumeRole
+            Resource: !Sub 'arn:${AWS::Partition}:iam::*:role${IamPath}*'
+          - Effect: Allow
+            Action: iam:PassRole
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role${IamPath}*'
 
           # Databricks spot instances need the EC2 spot service-linked role, and
