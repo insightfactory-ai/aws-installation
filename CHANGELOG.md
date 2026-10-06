@@ -80,12 +80,6 @@ against `SHA256SUMS` in this repository.
   A release reads a failed schema deploy's output there; the rest of the account's logs
   stay out of reach.
 
-- **`IFTerraformBoundary` lets a role assume another of ours in any account**, still
-  only under `IamPath`. The web application reads the other environments' control
-  databases, and the shared PostgreSQL, through a role in that database's account. Which
-  roles it may actually assume is set by its own policy, which names exact ARNs, and by
-  each target role's trust policy.
-
 ### Parameters and outputs
 
 - **Three parameters, all with working defaults**, and each because your account or

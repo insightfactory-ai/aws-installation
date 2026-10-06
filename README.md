@@ -115,9 +115,7 @@ ceiling on every IAM role the deployment creates, and it is the complete answer 
 allow-list, so everything absent from it is capped out; what prevents privilege
 escalation is the absence of `iam` from that policy. It also denies outright the
 account-level controls a reviewer looks for: AWS Organizations, account settings,
-CloudTrail logging, GuardDuty, Security Hub and Config. Its one reach beyond this account
-is `sts:AssumeRole` on roles under `IamPath` in another, which is how one environment's web
-application reads another environment's control database.
+CloudTrail logging, GuardDuty, Security Hub and Config.
 
 **If a deployment stops on an `AccessDenied`.** The action list is derived from the
 resource types the deployment declares and checked against CloudTrail from live
