@@ -30,10 +30,10 @@ written into the template rather than asked of you, so none of it can drift betw
 the file your security team reviewed and the stack you deployed. Changing any of it
 means a new version of the template, not an edit to your copy.
 
-Three parameters remain, all with working defaults, because your account and your
+Four parameters remain, all with working defaults, because your account and your
 organisation decide them rather than us: whether to create the identity provider
-entry, the IAM path, and whether to place one of your own permissions boundaries on
-the role. See [Parameters](#parameters).
+entry, the IAM path, whether to place one of your own permissions boundaries on the
+role, and whether our access is currently enabled. See [Parameters](#parameters).
 
 ## How access works
 
@@ -74,15 +74,15 @@ to leak, and nothing to revoke except the role itself.
 Two independent limits, and the second holds regardless of the first.
 
 **What it can reach.** The role is attached to four managed policies this stack
-creates, which between them name **396 individual actions**. Every action is written
+creates, which between them name **403 individual actions**. Every action is written
 in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
 search of a list rather than a judgement about what a wildcard covers.
 
-Those actions fall inside the twenty-two services the platform uses: `ecr`, `ec2`,
+Those actions fall inside the twenty-three services the platform uses: `ecr`, `ec2`,
 `ecs`, `elasticloadbalancing`, `acm`, `s3`, `kms`, `secretsmanager`, `lambda`, `glue`,
-`rds`, `elasticache`, `sns`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
+`rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`, `bedrock`,
 `vpc-lattice`, `ram`, `iam`, `sts`, plus the tagging API. Every other AWS service is
-absent, and so is every action within those twenty-two that the deployment does not
+absent, and so is every action within those twenty-three that the deployment does not
 call. Read `IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData`
 and `IFTerraformDeployCompute` in the template for the exact documents.
 
@@ -201,14 +201,15 @@ outputs (`OidcProviderArn`, `DeployPolicyArns` and
 
 ## Parameters
 
-Three, and each exists because your account or your organisation decides it rather
-than us. All three have working defaults, and the defaults are correct unless your
+Four, and each exists because your account or your organisation decides it rather
+than us. All four have working defaults, and the defaults are correct unless your
 organisation imposes a standard of its own.
 
 | Parameter | Default | |
 |---|---|---|
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per identity provider, and a second attempt fails as a duplicate. |
 | `IamPath` | `/insightfactory/` | The path every role, group and policy the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or its first apply is denied. A bare `/` is refused: it would put our roles at your account root, where the policies could no longer tell ours apart from yours. |
+| `InsightFactoryAccess` | `Enabled` | The switch for our access. `Disabled` turns the role's trust policy into a deny: no new session can be obtained, nothing is deleted, and your Insight Factory keeps running, because nothing it runs uses `IFTerraform`. Set it back to `Enabled` for the next release. See [Revoking access](#revoking-access). |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. If your organisation requires a permissions boundary on every IAM principal, supply its ARN and it is applied to `IFTerraform`. **Tell us if you set it.** Your boundary intersects with everything the role is granted, so one narrower than the platform needs fails a deployment part-way through, with resources already created. |
 
 > `PermissionsBoundaryArn` is a boundary **your** organisation places on `IFTerraform`.
@@ -225,11 +226,21 @@ they can be.
 
 ## Revoking access
 
-Delete the stack. Every session our automation could obtain disappears with the role,
-and there is no credential that outlives it.
+**To suspend access**, update the stack and set `InsightFactoryAccess` to `Disabled`.
+The role's trust policy becomes a deny, so our automation cannot obtain a new session.
+Nothing is deleted, and your Insight Factory keeps running: its functions, containers
+and databases use their own roles, never `IFTerraform`. Releases, schema deployments and
+fixes wait until you set it back to `Enabled`, which is the same stack update.
 
-To suspend access without deleting, edit or remove the `sub` condition on the role's
-trust policy. That change is yours to make, and we cannot widen it from our side.
+A session issued before the change stays valid until it expires, at most four hours. To
+end it at once, open the `IFTerraform` role in the IAM console and choose **Revoke active
+sessions**, which denies every session issued before that moment
+([AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html)).
+
+**To remove access entirely**, delete the stack. Every session our automation could
+obtain disappears with the role, and there is no credential that outlives it.
+
+Both changes are yours to make, and we cannot undo either from our side.
 
 ## Auditing
 
