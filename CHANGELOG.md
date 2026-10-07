@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 372 individual actions between them, each written in full: there is no asterisk
+  name 373 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -131,6 +131,11 @@ service, and its `iam:CreateServiceLinkedRole` condition allows
 through a queue in the environment's own account. `IFTerraformBoundary` carries it
 because the function that sends them runs under a role the deployment creates. The queue
 actions are confined to queues in the account and region the stack is deployed in.
+
+`lambda:InvokeFunction` is there because the shared PostgreSQL, in the Shared account's
+private VPC, admits nothing from outside it. The deployment creates the login every
+environment signs in as by invoking a function inside that VPC, once, and again only
+when the login's password changes.
 
 ### If you deployed a pre-release copy
 
