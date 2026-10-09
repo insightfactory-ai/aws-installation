@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 374 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 376 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -331,6 +331,7 @@ Resources:
               StringEquals:
                 iam:AWSServiceName:
                   - ecs.amazonaws.com
+                  - elasticache.amazonaws.com
                   - elasticloadbalancing.amazonaws.com
                   - rds.amazonaws.com
                   - spot.amazonaws.com
@@ -518,11 +519,13 @@ Resources:
             Effect: Allow
             Action:
               - secretsmanager:CreateSecret
+              - secretsmanager:DeleteResourcePolicy
               - secretsmanager:DeleteSecret
               - secretsmanager:DescribeSecret
               - secretsmanager:GetResourcePolicy
               - secretsmanager:GetSecretValue
               - secretsmanager:ListSecretVersionIds
+              - secretsmanager:PutResourcePolicy
               - secretsmanager:PutSecretValue
               - secretsmanager:RestoreSecret
               - secretsmanager:TagResource

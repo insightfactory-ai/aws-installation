@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 374 individual actions between them, each written in full: there is no asterisk
+  name 376 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -131,6 +131,14 @@ service, and its `iam:CreateServiceLinkedRole` condition allows
 through a queue in the environment's own account. `IFTerraformBoundary` carries it
 because the function that sends them runs under a role the deployment creates. The queue
 actions are confined to queues in the account and region the stack is deployed in.
+
+`iam:CreateServiceLinkedRole` allows `elasticache.amazonaws.com` because the first
+cache created in an account also creates ElastiCache's service-linked role, and an
+account that has never held a cache does not have it. `secretsmanager:PutResourcePolicy`
+and `secretsmanager:DeleteResourcePolicy` are there because the web applications in each
+environment's account read secrets held in the Shared account, and a secret read from
+another account needs a resource policy naming who may read it. They are confined to
+secrets in the account and region the stack is deployed in, as the other secret actions are.
 
 ### If you deployed a pre-release copy
 
