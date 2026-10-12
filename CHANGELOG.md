@@ -116,6 +116,10 @@ The four deploy policies cover the twenty-one services the platform uses: `ecr`,
 `glue`, `rds`, `elasticache`, `sns`, `sqs`, `scheduler`, `logs`, `cloudwatch`, `xray`,
 `bedrock`, `iam`, `sts`, plus the tagging API. Every other AWS service is absent.
 
+The boundary lets a role Terraform creates call Bedrock inference, including
+`bedrock:InvokeModelWithRequestedCrossRegionInference`, which a Claude cross-region
+inference profile needs. The deploy role itself gains no Bedrock action.
+
 `ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's web
 application and agent applications run on ECS behind an ALB with an ACM certificate.
 A release pushes the web application's image to the account's own registry, and runs

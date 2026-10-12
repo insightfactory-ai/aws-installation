@@ -858,11 +858,13 @@ Resources:
               - kms:RetireGrant
             Resource: '*'
 
-          # Only if you enabled Bedrock, and only inference.
+          # Only if you enabled Bedrock, and only inference. The cross-region action
+          # is what a Claude cross-region inference profile calls on the caller's behalf.
           - Effect: Allow
             Action:
               - bedrock:InvokeModel
               - bedrock:InvokeModelWithResponseStream
+              - bedrock:InvokeModelWithRequestedCrossRegionInference
               - bedrock:ListFoundationModels
               - bedrock:GetFoundationModel
             Resource: '*'
