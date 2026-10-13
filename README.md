@@ -64,7 +64,7 @@ update for you. That is the point: our CI cannot move without you seeing it.
 
 The condition applies to the role-assumption call only, not to the role's permissions,
 so it never interferes with AWS services acting on the role's behalf afterwards. See
-scoping note 4 in the template for why.
+scoping note 5 in the template for why.
 
 There is no shared secret in this arrangement, so there is nothing to rotate, nothing
 to leak, and nothing to revoke except the role itself.
@@ -74,7 +74,7 @@ to leak, and nothing to revoke except the role itself.
 Two independent limits, and the second holds regardless of the first.
 
 **What it can reach.** The role is attached to four managed policies this stack
-creates, which between them name **376 individual actions**. Every action is written
+creates, which between them name **364 individual actions**. Every action is written
 in full: there is no asterisk anywhere in the four documents, so "can it do X" is a
 search of a list rather than a judgement about what a wildcard covers.
 
@@ -89,7 +89,7 @@ and `IFTerraformDeployCompute` in the template for the exact documents.
 `iam` is in that list because the deployment creates and maintains the roughly fifteen
 IAM roles the platform's own services run under. Four grants bound what that means:
 
-1. **It can only touch its own identities.** Every role, group and policy the
+1. **It can only touch its own identities.** Every role and policy the
    deployment creates lives under `IamPath` (default `/insightfactory/`), and the IAM
    grants are scoped to that path by resource ARN. `iam:PassRole` is scoped to it too,
    so the role cannot hand one of your existing privileged roles to a function it
@@ -108,6 +108,9 @@ IAM roles the platform's own services run under. Four grants bound what that mea
 
 `iam:CreateUser` and `iam:CreateAccessKey` are not in any of the four policies, which
 makes "no users, no keys" a property your account enforces rather than a claim we make.
+Nor is any IAM group action or user policy attachment: the deployment creates no group,
+and your people's access is managed policies under `IamPath` that you attach to your own
+groups or IAM Identity Center permission sets.
 
 **What it cannot do, whatever policy is attached.** `IFTerraformBoundary` is the
 ceiling on every IAM role the deployment creates, and it is the complete answer to
@@ -208,7 +211,7 @@ organisation imposes a standard of its own.
 | Parameter | Default | |
 |---|---|---|
 | `CreateOidcProvider` | `Yes` | Set to `No` only if this account already trusts GitHub Actions from an earlier stack. An account holds one entry per identity provider, and a second attempt fails as a duplicate. |
-| `IamPath` | `/insightfactory/` | The path every role, group and policy the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or its first apply is denied. A bare `/` is refused: it would put our roles at your account root, where the policies could no longer tell ours apart from yours. |
+| `IamPath` | `/insightfactory/` | The path every role and policy the deployment creates is confined to. Change it if your IAM naming standard requires, and **tell us**, because our deployment must be configured with the same value or its first apply is denied. A bare `/` is refused: it would put our roles at your account root, where the policies could no longer tell ours apart from yours. |
 | `InsightFactoryAccess` | `Enabled` | The switch for our access. `Disabled` turns the role's trust policy into a deny: no new session can be obtained, nothing is deleted, and your Insight Factory keeps running, because nothing it runs uses `IFTerraform`. Set it back to `Enabled` for the next release. See [Revoking access](#revoking-access). |
 | `PermissionsBoundaryArn` | *(empty)* | Optional. If your organisation requires a permissions boundary on every IAM principal, supply its ARN and it is applied to `IFTerraform`. **Tell us if you set it.** Your boundary intersects with everything the role is granted, so one narrower than the platform needs fails a deployment part-way through, with resources already created. |
 

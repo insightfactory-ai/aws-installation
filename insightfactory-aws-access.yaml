@@ -58,7 +58,7 @@ Parameters:
       would put our roles at the account root, where the policies below could no longer
       tell ours apart from yours.
     Description: >-
-      The IAM path under which every role and group the deployment creates is placed.
+      The IAM path under which every role and policy the deployment creates is placed.
       It grants nothing by itself: it is what lets the policies below say "only under
       here" instead of "anywhere in this account". Leave it as supplied unless your
       naming standard requires otherwise - and if you change it, tell Insight Factory,
@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 376 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 364 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -271,23 +271,6 @@ Resources:
                   - rds.amazonaws.com
                   - ecs-tasks.amazonaws.com
                   - ecs.amazonaws.com
-          - Sid: ManageOurGroups
-            Effect: Allow
-            Action:
-              - iam:CreateGroup
-              - iam:DeleteGroup
-              - iam:DeleteGroupPolicy
-              - iam:GetGroup
-              - iam:GetGroupPolicy
-              - iam:ListGroupPolicies
-              - iam:PutGroupPolicy
-            Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:group${IamPath}*'
-          - Sid: ManageMembershipOfOurGroups
-            Effect: Allow
-            Action:
-              - iam:AddUserToGroup
-              - iam:RemoveUserFromGroup
-            Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:group${IamPath}*'
           - Sid: ManageOurCustomerManagedPolicies
             Effect: Allow
             Action:
@@ -301,15 +284,6 @@ Resources:
               - iam:ListPolicyVersions
               - iam:TagPolicy
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy${IamPath}*'
-          - Sid: AttachOnlyOurOwnPoliciesToAUser
-            Effect: Allow
-            Action:
-              - iam:AttachUserPolicy
-              - iam:DetachUserPolicy
-            Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:user/*'
-            Condition:
-              ArnLike:
-                iam:PolicyARN: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy${IamPath}*'
           - Sid: ManageTheEntraAndGitHubProviders
             Effect: Allow
             Action:
@@ -338,11 +312,9 @@ Resources:
           - Sid: ReadIamForPlan
             Effect: Allow
             Action:
-              - iam:GetGroup
               - iam:GetOpenIDConnectProvider
               - iam:GetPolicy
               - iam:GetRole
-              - iam:ListGroups
               - iam:ListOpenIDConnectProviders
               - iam:ListPolicies
               - iam:ListRoles
@@ -931,7 +903,7 @@ Outputs:
         - !Ref IFTerraformDeployCompute
   IamPath:
     Description: >-
-      The path the deployment's roles and groups are confined to. Send it to Insight
+      The path the deployment's roles and policies are confined to. Send it to Insight
       Factory only if you changed it from the default; the deployment must be
       configured with the same value.
     Value: !Ref IamPath
@@ -975,14 +947,11 @@ Outputs:
 #    tell us what failed and we will issue a corrected version of this template, so
 #    the change is reviewable and recorded rather than made once in your account.
 #
-# 4. What the role can still do that a condition cannot narrow. The deployment creates
-#    two IAM groups for your people, gives each an inline policy, and can add a named
-#    user to one. IAM has no condition key for the contents of an inline policy, and a
-#    group cannot carry a permissions boundary, so those three actions are granted on
-#    the path and bounded by nothing finer. They are scoped to groups under IamPath, so
-#    the role cannot touch a group of yours outside it. Removing the human-access groups
-#    from the deployment is the only thing that would remove this, and that is a product
-#    decision rather than a policy one.
+# 4. No IAM group and no IAM user. The deployment creates no group, adds no one to a
+#    group and attaches nothing to a user: your people's access is managed policies
+#    under IamPath, which you attach to your own groups or IAM Identity Center
+#    permission sets. So none of the four policies holds a group or user write, and
+#    the role cannot give a person access to anything.
 #
 # 5. On the source-IP condition. It sits on the role-assumption call rather than on
 #    the role's permissions. That is deliberate: an IP condition on the permissions
