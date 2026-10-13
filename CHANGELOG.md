@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 376 individual actions between them, each written in full: there is no asterisk
+  name 364 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -58,13 +58,13 @@ against `SHA256SUMS` in this repository.
   never interferes with AWS services acting on the role's behalf afterwards. Our CI
   cannot move without a new version of this template and a stack update you perform.
 
-- **Every role, group and policy the deployment creates is confined to `IamPath`**,
+- **Every role and policy the deployment creates is confined to `IamPath`**,
   default `/insightfactory/`. Its `AllowedPattern` requires at least one path segment,
   so a bare `/` is refused at stack-creation time: it would put our roles at your
   account root, where the path scoping could no longer tell ours apart from yours.
 
 - **Scoping is by resource ARN where the deployment's naming makes it exact**, and by
-  condition where it does not. IAM roles, groups and policies are scoped to `IamPath`,
+  condition where it does not. IAM roles and policies are scoped to `IamPath`,
   and the control database connection to one named database user. `iam:CreateRole`
   carries the `IFTerraformBoundary` requirement as a condition on the grant itself, so
   a role cannot be created without the ceiling. The policies that bound the role,
@@ -75,6 +75,12 @@ against `SHA256SUMS` in this repository.
   client may run more than one naming scheme, so a single prefix would not cover
   everything the deployment needs, and a parameter that is right some of the time is
   worse than none.
+
+- **No IAM group and no IAM user.** The deployment creates no group, adds no one to a
+  group and attaches nothing to a user, so no group action and neither
+  `iam:AttachUserPolicy` nor `iam:DetachUserPolicy` is granted. Your people's access is
+  managed policies under `IamPath`, which you attach to your own groups or IAM Identity
+  Center permission sets.
 
 - **Logs are readable only under `/ecs/`**, where the deployment's containers write.
   A release reads a failed schema deploy's output there; the rest of the account's logs
