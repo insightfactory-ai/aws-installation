@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 364 individual actions between them, each written in full: there is no asterisk
+  name 371 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -145,6 +145,14 @@ and `secretsmanager:DeleteResourcePolicy` are there because the web applications
 environment's account read secrets held in the Shared account, and a secret read from
 another account needs a resource policy naming who may read it. They are confined to
 secrets in the account and region the stack is deployed in, as the other secret actions are.
+
+`lambda:InvokeFunction` is there because the shared stack calls its own login function once
+during the apply, to give the shared PostgreSQL its login, and the call is the deploy
+role's. `ec2:AssociateVpcCidrBlock` and `ec2:DisassociateVpcCidrBlock` add and remove the
+second range the Shared VPC carries for staff access. `iam:UpdateRole`,
+`iam:UpdateRoleDescription`, `kms:UpdateKeyDescription` and `iam:UntagPolicy` let an
+existing deployment change a role's or key's description and a policy's tags in place
+rather than fail; they are confined as the other role, key and policy actions are.
 
 ### If you deployed a pre-release copy
 
