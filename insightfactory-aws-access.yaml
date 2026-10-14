@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 364 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 371 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -242,6 +242,8 @@ Resources:
               - iam:TagRole
               - iam:UntagRole
               - iam:UpdateAssumeRolePolicy
+              - iam:UpdateRole
+              - iam:UpdateRoleDescription
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role${IamPath}*'
           - Sid: AttachOnlyOurOwnOrNamedAwsPolicies
             Effect: Allow
@@ -283,6 +285,7 @@ Resources:
               - iam:ListEntitiesForPolicy
               - iam:ListPolicyVersions
               - iam:TagPolicy
+              - iam:UntagPolicy
             Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy${IamPath}*'
           - Sid: ManageTheEntraAndGitHubProviders
             Effect: Allow
@@ -357,6 +360,7 @@ Resources:
             Action:
               - ec2:AllocateAddress
               - ec2:AssociateRouteTable
+              - ec2:AssociateVpcCidrBlock
               - ec2:AttachInternetGateway
               - ec2:CreateInternetGateway
               - ec2:CreateNatGateway
@@ -377,6 +381,7 @@ Resources:
               - ec2:DetachInternetGateway
               - ec2:DisassociateAddress
               - ec2:DisassociateRouteTable
+              - ec2:DisassociateVpcCidrBlock
               - ec2:ModifySubnetAttribute
               - ec2:ModifyVpcAttribute
               - ec2:ModifyVpcEndpoint
@@ -482,6 +487,7 @@ Resources:
               - kms:TagResource
               - kms:UntagResource
               - kms:UpdateAlias
+              - kms:UpdateKeyDescription
             Resource: '*'
           - Sid: ListSecrets
             Effect: Allow
@@ -603,6 +609,7 @@ Resources:
               - lambda:GetFunctionEventInvokeConfig
               - lambda:GetFunctionUrlConfig
               - lambda:GetPolicy
+              - lambda:InvokeFunction
               - lambda:ListDurableExecutionsByFunction
               - lambda:ListTags
               - lambda:ListVersionsByFunction
