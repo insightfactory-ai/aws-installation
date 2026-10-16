@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 371 individual actions between them, each written in full: there is no asterisk
+  name 373 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -153,6 +153,11 @@ second range the Shared VPC carries for staff access. `iam:UpdateRole`,
 `iam:UpdateRoleDescription`, `kms:UpdateKeyDescription` and `iam:UntagPolicy` let an
 existing deployment change a role's or key's description and a policy's tags in place
 rather than fail; they are confined as the other role, key and policy actions are.
+
+`lambda:PublishLayerVersion` and `lambda:GetLayerVersion` are there because a release of
+the orchestrator publishes a new version of its dependency layer and attaches it to the
+orchestrator and ticker functions, and attaching a layer needs permission to read that
+layer version.
 
 ### If you deployed a pre-release copy
 
