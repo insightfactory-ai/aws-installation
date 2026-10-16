@@ -154,6 +154,23 @@ second range the Shared VPC carries for staff access. `iam:UpdateRole`,
 existing deployment change a role's or key's description and a policy's tags in place
 rather than fail; they are confined as the other role, key and policy actions are.
 
+### The Terraform state role (optional)
+
+- **`insightfactory-terraform-state.yaml`**, a second template for customers who keep
+  Insight Factory's Terraform state in their own S3 bucket. Deployed once, in the
+  bucket's account. It creates **`IFTerraformState`**, and the GitHub identity provider
+  entry only when `CreateOidcProvider` is `Yes`.
+
+- **What the role can reach.** `s3:ListBucket` on the bucket, `s3:GetObject` and
+  `s3:PutObject` on its objects, and `s3:DeleteObject` only on `*.tflock`, the lock files
+  Terraform removes when it releases a lock. With `KmsKeyArn`, `kms:Decrypt` and
+  `kms:GenerateDataKey` on that key, only through S3 and only for this bucket. Nothing
+  else.
+
+- **What it trusts.** The same trust policy as `IFTerraform`, condition for condition,
+  with the same four-hour maximum session: Terraform holds the session for a whole plan
+  or apply and asks for four hours, and a role allowing less refuses it.
+
 ### If you deployed a pre-release copy
 
 An account holding an earlier copy of this template needs a stack update before
