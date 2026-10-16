@@ -196,7 +196,12 @@ Resources:
                   Condition:
                     StringLike:
                       kms:ViaService: s3.*.amazonaws.com
-                      kms:EncryptionContext:aws:s3:arn: !Sub arn:${AWS::Partition}:s3:::${StateBucketName}*
+                      # The bucket (with S3 Bucket Keys) or an object in it. Not a
+                      # trailing *, which would also match a bucket whose name begins
+                      # with this one's.
+                      kms:EncryptionContext:aws:s3:arn:
+                        - !Sub arn:${AWS::Partition}:s3:::${StateBucketName}
+                        - !Sub arn:${AWS::Partition}:s3:::${StateBucketName}/*
                 - !Ref AWS::NoValue
 
       Tags:
