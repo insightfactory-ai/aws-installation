@@ -240,7 +240,8 @@ automation needs to reach it, `IFTerraformState`.
 
 **The role can reach that bucket and nothing else.** It may list the bucket, read and
 write its objects, and delete only the lock files Terraform removes when it releases a
-lock (`*.tflock`), so a state file cannot be deleted with it. With `KmsKeyArn` it may
+lock (`*.tflock`). It cannot delete a state file, but writing one can overwrite it, so
+keep versioning on: that is what lets an earlier state be recovered. With `KmsKeyArn` it may
 also use that one key for the bucket's objects. It has no other S3 access, no other
 service and no IAM action.
 
@@ -251,7 +252,10 @@ the same four CI addresses, the same four-hour session and the same
 1. **Create the bucket first.** One bucket for every environment, used for nothing else,
    with versioning on so an earlier state can be recovered, and public access blocked.
    Terraform writes the state with SSE-S3, so a bucket policy must not refuse SSE-S3
-   uploads.
+   uploads. Nor should it refuse uploads that carry no encryption header: our release
+   automation writes two small marker files beside the state without one, and a refusal
+   fails the release after its changes are applied. The bucket's default encryption
+   covers those files anyway.
 2. **Deploy the stack once, in the bucket's account.** Leave `CreateOidcProvider` as `No`
    where `insightfactory-access` is already deployed in that account, which is the usual
    case; set it to `Yes` only where nothing in the account trusts GitHub yet.
@@ -273,7 +277,7 @@ the same four CI addresses, the same four-hour session and the same
 | `StateBucketName` | *(required)* | The bucket. It must already exist. |
 | `KmsKeyArn` | *(empty)* | Only if the bucket's default encryption is a customer-managed KMS key: its ARN. Its key policy must allow IAM policies in the account to grant its use. |
 | `CreateOidcProvider` | `No` | `Yes` only where the account has no GitHub identity provider entry yet. |
-| `PermissionsBoundaryArn` | *(empty)* | As in the access stack. It must allow the S3 actions above on the bucket. |
+| `PermissionsBoundaryArn` | *(empty)* | As in the access stack. It must allow the S3 actions above on the bucket, and with `KmsKeyArn` also `kms:Decrypt` and `kms:GenerateDataKey` on that key. |
 | `InsightFactoryAccess` | `Enabled` | As in the access stack. `Disabled` refuses every new session; the state stays in your bucket. |
 
 ## Revoking access
@@ -291,6 +295,13 @@ sessions**, which denies every session issued before that moment
 
 **To remove access entirely**, delete the stack. Every session our automation could
 obtain disappears with the role, and there is no credential that outlives it.
+
+**If you keep the Terraform state yourself**, `insightfactory-terraform-state` has the
+same `InsightFactoryAccess` switch, and `IFTerraformState` the same **Revoke active
+sessions**. To suspend our access fully, set `Disabled` in both stacks, and revoke
+sessions on both roles. Deleting the
+state stack removes `IFTerraformState` and leaves the bucket and the state in it
+untouched.
 
 Both changes are yours to make, and we cannot undo either from our side.
 

@@ -83,7 +83,8 @@ Parameters:
     Description: >-
       Optional. If your organisation requires a permissions boundary on IAM principals,
       supply its ARN and it is applied to IFTerraformState. It must allow the S3 actions
-      below on the bucket, or every release stops at its first state read.
+      below on the bucket, and with KmsKeyArn the two KMS actions on that key, or every
+      release stops at its first state read.
 
   # The switch for our access, as in the access stack. Disabled refuses every new
   # session and deletes nothing: the state stays in your bucket.
@@ -179,7 +180,9 @@ Resources:
                   - s3:PutObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${StateBucketName}/*
               # Delete only the lock files, which Terraform removes when it releases
-              # a lock. A state file cannot be deleted with this role.
+              # a lock. A state file cannot be deleted with this role, but PutObject
+              # can overwrite one: versioning on the bucket is what makes that
+              # recoverable.
               - Sid: ReleaseTheLock
                 Effect: Allow
                 Action: s3:DeleteObject
@@ -195,7 +198,7 @@ Resources:
                   Resource: !Ref KmsKeyArn
                   Condition:
                     StringLike:
-                      kms:ViaService: s3.*.amazonaws.com
+                      kms:ViaService: !Sub 's3.*.${AWS::URLSuffix}'
                       # The bucket (with S3 Bucket Keys) or an object in it. Not a
                       # trailing *, which would also match a bucket whose name begins
                       # with this one's.
@@ -229,6 +232,8 @@ Outputs:
 #
 # 2. What the role can reach. List the one bucket; read and write its objects; delete
 #    only objects ending .tflock. No other bucket, no other service and no IAM action.
+#    Writing includes overwriting, so a state file cannot be deleted but can be
+#    replaced; keep versioning on so any earlier state can be recovered.
 #    The release automation's other work in this account, if any, uses IFTerraform.
 #
 # 3. What the state is. Terraform's record of every resource the deployment created
@@ -238,9 +243,12 @@ Outputs:
 #
 # 4. Encryption. Terraform writes the state with SSE-S3 (AES256). A bucket policy that
 #    refuses uploads without SSE-KMS will refuse the state, so leave SSE-S3 permitted.
-#    If the bucket's default is a customer-managed KMS key, supply KmsKeyArn: objects
-#    written without an explicit setting, such as the release workflow's markers, take
-#    the default, and reading them needs the key.
+#    The release workflow writes two small marker files beside the state without an
+#    encryption header, so a policy that refuses uploads lacking the header will fail
+#    a release after its apply. Rely on the bucket's default encryption instead, which
+#    applies to every object either way. If that default is a customer-managed KMS
+#    key, supply KmsKeyArn: the markers take the default, and reading them needs the
+#    key.
 #
 # 5. Revoking access. Set InsightFactoryAccess to Disabled, or delete this stack.
 #    Either way the state stays in your bucket; releases wait until access returns.

@@ -170,7 +170,8 @@ layer version.
   `s3:PutObject` on its objects, and `s3:DeleteObject` only on `*.tflock`, the lock files
   Terraform removes when it releases a lock. With `KmsKeyArn`, `kms:Decrypt` and
   `kms:GenerateDataKey` on that key, only through S3 and only for this bucket. Nothing
-  else.
+  else. It cannot delete a state file but can overwrite one, as Terraform must, so the
+  bucket should keep versioning on.
 
 - **What it trusts.** The same trust policy as `IFTerraform`, condition for condition,
   with the same four-hour maximum session: Terraform holds the session for a whole plan
