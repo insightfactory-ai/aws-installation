@@ -1,0 +1,256 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >-
+  Insight Factory Terraform state access. Optional: deploy it only if you keep Insight
+  Factory's Terraform state in your own S3 bucket. Creates one IAM role that Insight
+  Factory's release automation assumes to read and write the state in that one bucket,
+  and nothing else. It trusts the same repository, branch and CI addresses as the
+  IFTerraform role in the access stack. No IAM users, no access keys and no long-lived
+  credentials are created.
+
+# ---------------------------------------------------------------------------------
+# Deploy ONCE, in the AWS account that holds the state bucket, and only if you keep
+# Insight Factory's Terraform state yourself. If Insight Factory keeps it, which is the
+# default, you need nothing from this file.
+#
+#   aws cloudformation deploy \
+#     --template-file insightfactory-terraform-state.yaml \
+#     --stack-name insightfactory-terraform-state \
+#     --region <your-region> \
+#     --parameter-overrides StateBucketName=<your-bucket> \
+#     --capabilities CAPABILITY_NAMED_IAM
+#
+# Then send Insight Factory the bucket name, the bucket's Region and the RoleArn output.
+#
+# Create the bucket first; this stack does not create it. One bucket holds the state of
+# every environment, so give it to Insight Factory alone: the role can read and write
+# every object in it.
+#
+# What this stack trusts is written into it, exactly as in the access stack: the
+# repository and branch, the CI addresses and the session length. The parameters are
+# the things your bucket and your account decide.
+# ---------------------------------------------------------------------------------
+
+Parameters:
+  # The one bucket the role can reach. It must already exist.
+  StateBucketName:
+    Type: String
+    AllowedPattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+    ConstraintDescription: >-
+      An S3 bucket name: 3 to 63 lower-case letters, digits, dots and hyphens,
+      beginning and ending with a letter or digit.
+    Description: >-
+      The S3 bucket that will hold Insight Factory's Terraform state. Create it before
+      this stack, with versioning on, and use it for nothing else.
+
+  # Only when the bucket's default encryption is a KMS key of your own. Terraform writes
+  # the state itself with SSE-S3, but other objects in the bucket follow its default, so
+  # a customer-managed key must be readable by the role.
+  KmsKeyArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^(arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/[a-zA-Z0-9-]+)?$'
+    ConstraintDescription: >-
+      Leave empty, or supply the full ARN of a KMS key, for example
+      arn:aws:kms:ap-southeast-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab.
+    Description: >-
+      Optional. Only if the bucket's default encryption is SSE-KMS with a customer-managed
+      key: that key's ARN. The role is then allowed to use the key for this bucket's
+      objects. Its key policy must also allow the account's IAM policies to grant it.
+
+  # AWS account state decides this one, not you. An account holds one entry per
+  # identity provider. The access stack creates it, so in an account where
+  # insightfactory-access is deployed the entry already exists and creating a second
+  # fails as a duplicate. That is the usual case, which is why the default is No.
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+    Description: >-
+      Leave as No where the insightfactory-access stack, or anything else, already trusts
+      https://token.actions.githubusercontent.com in this account. Set to Yes only if the
+      bucket is in an account with neither.
+
+  # Your organisation decides this one, as in the access stack: some require a
+  # permissions boundary on every IAM principal, enforced by an SCP.
+  PermissionsBoundaryArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^(arn:aws[a-zA-Z-]*:iam::([0-9]{12}|aws):policy/.+)?$'
+    ConstraintDescription: >-
+      Leave empty, or supply the full ARN of an IAM managed policy - your own, for
+      example arn:aws:iam::123456789012:policy/OrgBoundary, or an AWS-managed one.
+    Description: >-
+      Optional. If your organisation requires a permissions boundary on IAM principals,
+      supply its ARN and it is applied to IFTerraformState. It must allow the S3 actions
+      below on the bucket, and with KmsKeyArn the two KMS actions on that key, or every
+      release stops at its first state read.
+
+  # The switch for our access, as in the access stack. Disabled refuses every new
+  # session and deletes nothing: the state stays in your bucket.
+  InsightFactoryAccess:
+    Type: String
+    AllowedValues: ['Enabled', 'Disabled']
+    Default: 'Enabled'
+    Description: >-
+      Enabled lets Insight Factory's release automation assume IFTerraformState.
+      Disabled refuses every new session without deleting anything. Sessions already
+      issued last until they expire (at most four hours); use Revoke active sessions on
+      the role to end them at once.
+
+Conditions:
+  MakeOidcProvider: !Equals [!Ref CreateOidcProvider, 'Yes']
+  HasKmsKey: !Not [!Equals [!Ref KmsKeyArn, '']]
+  HasBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, '']]
+  AccessEnabled: !Equals [!Ref InsightFactoryAccess, 'Enabled']
+
+Resources:
+
+  # -------------------------------------------------------------------------------
+  # GitHub as an OIDC identity provider, only where nothing in this account trusts it
+  # yet. ThumbprintList is omitted for the same reason as in the access stack: AWS
+  # validates GitHub's tokens against its own library of trusted root CAs.
+  # -------------------------------------------------------------------------------
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - { Key: ManagedBy, Value: InsightFactory }
+
+  # -------------------------------------------------------------------------------
+  # The role. It can reach the one bucket and nothing else: no other S3 bucket, no
+  # other service, no IAM.
+  # -------------------------------------------------------------------------------
+  StateRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: IFTerraformState
+      Description: Assumed by Insight Factory GitHub Actions to read and write the Insight Factory Terraform state in one S3 bucket.
+      # Four hours, the same as IFTerraform. Terraform holds this session for the whole
+      # of a plan or apply, asking for four hours, and writes the state at the end; a
+      # role allowing less refuses the session outright.
+      MaxSessionDuration: 14400
+      PermissionsBoundary: !If [HasBoundary, !Ref PermissionsBoundaryArn, !Ref 'AWS::NoValue']
+
+      # Identical to IFTerraform's trust policy in the access stack: the same audience,
+      # the same repository and branch by id, and the same four addresses. Read the
+      # comments there for why each condition is written as it is.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: !If [AccessEnabled, Allow, Deny]
+            Principal:
+              Federated: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: 'repo:insightfactory-ai@76498963/if_sre_github_releases@1307263479:ref:refs/heads/main'
+              IpAddress:
+                aws:SourceIp:
+                  - 192.240.244.134/32   # primary   (us-west)
+                  - 192.240.244.165/32   # primary   (us-west)
+                  - 152.236.40.73/32     # failover  (us-east)
+                  - 152.236.40.227/32    # failover  (us-east)
+
+      # Four S3 actions, plus two KMS actions with KmsKeyArn, every one named in full
+      # and scoped to the bucket.
+      Policies:
+        - PolicyName: TerraformState
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Proving the bucket exists before a missing state is read as "no state
+              # yet", telling a missing object (404) from a refused one (403), and
+              # Terraform's own listing of the bucket at init.
+              - Sid: ListTheStateBucket
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${StateBucketName}
+              # The state, its lock and the two markers the release workflow writes
+              # beside it.
+              - Sid: ReadAndWriteTheState
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${StateBucketName}/*
+              # Delete only the lock files, which Terraform removes when it releases
+              # a lock. A state file cannot be deleted with this role, but PutObject
+              # can overwrite one: versioning on the bucket is what makes that
+              # recoverable.
+              - Sid: ReleaseTheLock
+                Effect: Allow
+                Action: s3:DeleteObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${StateBucketName}/*.tflock
+              # Only with KmsKeyArn, and only for S3 calls on this bucket.
+              - !If
+                - HasKmsKey
+                - Sid: UseTheBucketKey
+                  Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                    - kms:GenerateDataKey
+                  Resource: !Ref KmsKeyArn
+                  Condition:
+                    StringLike:
+                      kms:ViaService: !Sub 's3.*.${AWS::URLSuffix}'
+                      # The bucket (with S3 Bucket Keys) or an object in it. Not a
+                      # trailing *, which would also match a bucket whose name begins
+                      # with this one's.
+                      kms:EncryptionContext:aws:s3:arn:
+                        - !Sub arn:${AWS::Partition}:s3:::${StateBucketName}
+                        - !Sub arn:${AWS::Partition}:s3:::${StateBucketName}/*
+                - !Ref AWS::NoValue
+
+      Tags:
+        - { Key: ManagedBy, Value: InsightFactory }
+
+Outputs:
+  RoleArn:
+    Description: Send to Insight Factory, with the bucket name and the bucket's Region.
+    Value: !GetAtt StateRole.Arn
+  StateBucketName:
+    Description: The bucket the role can reach. Send it to Insight Factory with the RoleArn.
+    Value: !Ref StateBucketName
+  OidcProviderArn:
+    Condition: MakeOidcProvider
+    Description: The GitHub identity provider this stack created.
+    Value: !Ref GitHubOidcProvider
+
+# ---------------------------------------------------------------------------------
+# SCOPING NOTES for a security review
+#
+# 1. The same way in as IFTerraform. The trust policy is the access stack's, condition
+#    for condition: a GitHub-signed token for sts.amazonaws.com, from one repository on
+#    one branch named by id, from one of four addresses. Its notes 1 and 5 apply here
+#    unchanged.
+#
+# 2. What the role can reach. List the one bucket; read and write its objects; delete
+#    only objects ending .tflock. No other bucket, no other service and no IAM action.
+#    Writing includes overwriting, so a state file cannot be deleted but can be
+#    replaced; keep versioning on so any earlier state can be recovered.
+#    The release automation's other work in this account, if any, uses IFTerraform.
+#
+# 3. What the state is. Terraform's record of every resource the deployment created
+#    in your accounts, and the values Terraform needs to manage them. Treat the bucket
+#    as you would any record of your infrastructure: versioning on, public access
+#    blocked, and read access for your own people kept to those who need it.
+#
+# 4. Encryption. Terraform writes the state with SSE-S3 (AES256). A bucket policy that
+#    refuses uploads without SSE-KMS will refuse the state, so leave SSE-S3 permitted.
+#    The release workflow writes two small marker files beside the state without an
+#    encryption header, so a policy that refuses uploads lacking the header will fail
+#    a release after its apply. Rely on the bucket's default encryption instead, which
+#    applies to every object either way. If that default is a customer-managed KMS
+#    key, supply KmsKeyArn: the markers take the default, and reading them needs the
+#    key.
+#
+# 5. Revoking access. Set InsightFactoryAccess to Disabled, or delete this stack.
+#    Either way the state stays in your bucket; releases wait until access returns.
+#    Nothing running in your Insight Factory uses this role.
+# ---------------------------------------------------------------------------------

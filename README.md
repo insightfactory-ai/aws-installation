@@ -6,6 +6,10 @@ Your team deploys one CloudFormation stack per AWS account. It creates an identi
 provider entry and one IAM role, and it is the only thing Insight Factory needs from
 you. **No password, access key, or AWS credential of any kind is shared with us.**
 
+If you keep Insight Factory's Terraform state in your own S3 bucket, you also deploy a
+second, much smaller stack once, in the bucket's account. See
+[If you keep the Terraform state yourself](#if-you-keep-the-terraform-state-yourself).
+
 Everything in this repository is public so that your cloud and security teams can read
 it, check it against the checksums below, and keep a copy of exactly what they
 reviewed, without needing an account or asking us for access.
@@ -227,6 +231,55 @@ they can be.
 > Tightening it below what the platform needs fails a deployment part-way through,
 > with resources already created.
 
+## If you keep the Terraform state yourself
+
+The Terraform state is the record of every resource the deployment has created in your
+accounts. By default Insight Factory keeps it. If you would rather keep it in an S3
+bucket of your own, `insightfactory-terraform-state.yaml` creates the one role our
+automation needs to reach it, `IFTerraformState`.
+
+**The role can reach that bucket and nothing else.** It may list the bucket, read and
+write its objects, and delete only the lock files Terraform removes when it releases a
+lock (`*.tflock`). It cannot delete a state file, but writing one can overwrite it, so
+keep versioning on: that is what lets an earlier state be recovered. With `KmsKeyArn` it may
+also use that one key for the bucket's objects. It has no other S3 access, no other
+service and no IAM action.
+
+**It trusts exactly what `IFTerraform` trusts:** the same repository and branch by id,
+the same four CI addresses, the same four-hour session and the same
+`InsightFactoryAccess` switch.
+
+1. **Create the bucket first.** One bucket for every environment, used for nothing else,
+   with versioning on so an earlier state can be recovered, and public access blocked.
+   Terraform writes the state with SSE-S3, so a bucket policy must not refuse SSE-S3
+   uploads. Nor should it refuse uploads that carry no encryption header: our release
+   automation writes two small marker files beside the state without one, and a refusal
+   fails the release after its changes are applied. The bucket's default encryption
+   covers those files anyway.
+2. **Deploy the stack once, in the bucket's account.** Leave `CreateOidcProvider` as `No`
+   where `insightfactory-access` is already deployed in that account, which is the usual
+   case; set it to `Yes` only where nothing in the account trusts GitHub yet.
+
+   ```bash
+   aws cloudformation deploy \
+     --template-file insightfactory-terraform-state.yaml \
+     --stack-name insightfactory-terraform-state \
+     --region <your-region> \
+     --parameter-overrides StateBucketName=<your-bucket> \
+     --capabilities CAPABILITY_NAMED_IAM
+   ```
+
+3. **Send us** the bucket name, the bucket's Region and the `RoleArn` output, with the
+   rest of your installation workbook.
+
+| Parameter | Default | |
+|---|---|---|
+| `StateBucketName` | *(required)* | The bucket. It must already exist. |
+| `KmsKeyArn` | *(empty)* | Only if the bucket's default encryption is a customer-managed KMS key: its ARN. Its key policy must allow IAM policies in the account to grant its use. |
+| `CreateOidcProvider` | `No` | `Yes` only where the account has no GitHub identity provider entry yet. |
+| `PermissionsBoundaryArn` | *(empty)* | As in the access stack. It must allow the S3 actions above on the bucket, and with `KmsKeyArn` also `kms:Decrypt` and `kms:GenerateDataKey` on that key. |
+| `InsightFactoryAccess` | `Enabled` | As in the access stack. `Disabled` refuses every new session; the state stays in your bucket. |
+
 ## Revoking access
 
 **To suspend access**, update the stack and set `InsightFactoryAccess` to `Disabled`.
@@ -242,6 +295,13 @@ sessions**, which denies every session issued before that moment
 
 **To remove access entirely**, delete the stack. Every session our automation could
 obtain disappears with the role, and there is no credential that outlives it.
+
+**If you keep the Terraform state yourself**, `insightfactory-terraform-state` has the
+same `InsightFactoryAccess` switch, and `IFTerraformState` the same **Revoke active
+sessions**. To suspend our access fully, set `Disabled` in both stacks, and revoke
+sessions on both roles. Deleting the
+state stack removes `IFTerraformState` and leaves the bucket and the state in it
+untouched.
 
 Both changes are yours to make, and we cannot undo either from our side.
 
