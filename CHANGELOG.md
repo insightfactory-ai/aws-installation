@@ -163,8 +163,8 @@ layer version.
 are there because a release of the orchestrator publishes a numbered version of it and
 points its `live` alias at that version, creating the alias on the first release. The
 ticker calls the orchestrator through that alias, so work already in progress during a
-release finishes on the code it started on. Nothing deletes a version or an alias, so
-neither delete action is granted.
+release finishes on the code it started on. Nothing deletes an alias, so
+`lambda:DeleteAlias` is not granted.
 
 ### The Terraform state role (optional)
 
