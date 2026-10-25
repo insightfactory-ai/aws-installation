@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 373 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 377 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -596,12 +596,14 @@ Resources:
             Effect: Allow
             Action:
               - lambda:AddPermission
+              - lambda:CreateAlias
               - lambda:CreateFunction
               - lambda:CreateFunctionUrlConfig
               - lambda:DeleteFunction
               - lambda:DeleteFunctionConcurrency
               - lambda:DeleteFunctionEventInvokeConfig
               - lambda:DeleteFunctionUrlConfig
+              - lambda:GetAlias
               - lambda:GetFunction
               - lambda:GetFunctionCodeSigningConfig
               - lambda:GetFunctionConcurrency
@@ -615,11 +617,13 @@ Resources:
               - lambda:ListTags
               - lambda:ListVersionsByFunction
               - lambda:PublishLayerVersion
+              - lambda:PublishVersion
               - lambda:PutFunctionConcurrency
               - lambda:PutFunctionEventInvokeConfig
               - lambda:RemovePermission
               - lambda:TagResource
               - lambda:UntagResource
+              - lambda:UpdateAlias
               - lambda:UpdateFunctionCode
               - lambda:UpdateFunctionConfiguration
               - lambda:UpdateFunctionEventInvokeConfig

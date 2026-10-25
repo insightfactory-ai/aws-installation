@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 373 individual actions between them, each written in full: there is no asterisk
+  name 377 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -158,6 +158,13 @@ rather than fail; they are confined as the other role, key and policy actions ar
 the orchestrator publishes a new version of its dependency layer and attaches it to the
 orchestrator and ticker functions, and attaching a layer needs permission to read that
 layer version.
+
+`lambda:PublishVersion`, `lambda:GetAlias`, `lambda:CreateAlias` and `lambda:UpdateAlias`
+are there because a release of the orchestrator publishes a numbered version of it and
+points its `live` alias at that version, creating the alias on the first release. The
+ticker calls the orchestrator through that alias, so work already in progress during a
+release finishes on the code it started on. Nothing deletes an alias, so
+`lambda:DeleteAlias` is not granted.
 
 ### The Terraform state role (optional)
 
