@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 377 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 378 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -773,12 +773,15 @@ Resources:
               - elasticloadbalancing:SetSecurityGroups
               - elasticloadbalancing:SetSubnets
             Resource: '*'
-          # The control database has no public endpoint, so a release deploys its schema
-          # from a task inside the VPC: it starts the task and waits for it to stop.
+          # The control and hierarchy manager databases have no public endpoint, so a release
+          # deploys their schemas from a task inside the VPC: it starts the task and waits for
+          # it to stop. It lists the tasks of the deploy's task definition first, and refuses
+          # to start a second while one is still running.
           - Sid: RunTheSchemaDeploy
             Effect: Allow
             Action:
               - ecs:DescribeTasks
+              - ecs:ListTasks
               - ecs:RunTask
             Resource: '*'
           # A failed deploy says why only in its container's log. Reading stops at /ecs/,
