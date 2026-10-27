@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 377 individual actions between them, each written in full: there is no asterisk
+  name 378 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -125,9 +125,11 @@ The four deploy policies cover the twenty-one services the platform uses: `ecr`,
 `ecs`, `elasticloadbalancing`, `acm` and `ecr` are there because the platform's web
 application and agent applications run on ECS behind an ALB with an ACM certificate.
 A release pushes the web application's image to the account's own registry, and runs
-the control database's schema deploy as a task, since the database has no public
-endpoint; so the role may also push images, run and describe tasks, and read container
-logs. `IFTerraformBoundary`
+the control and hierarchy manager databases' schema deploys as tasks, since neither
+database has a public endpoint; so the role may also push images, run and describe tasks,
+and read container logs. It may list tasks too, because a schema deploy first looks for a
+running task of its own task definition and refuses to start a second while one is still
+running. `IFTerraformBoundary`
 carries `ecr`, `ecs` and `application-autoscaling` because the roles the deployment
 creates for those applications push images, register task definitions and scale the
 service, and its `iam:CreateServiceLinkedRole` condition allows
