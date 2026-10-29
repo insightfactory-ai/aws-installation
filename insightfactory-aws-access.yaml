@@ -196,7 +196,7 @@ Resources:
   # -------------------------------------------------------------------------------
   # What the role may do.
   #
-  # Enumerated actions, not service wildcards. 378 actions, each named in full, with no
+  # Enumerated actions, not service wildcards. 382 actions, each named in full, with no
   # asterisk anywhere in the four policies. The list is derived from the resource types
   # the deployment declares and checked against CloudTrail from live installations. A
   # first install may still meet an AccessDenied on an API neither source showed, which
@@ -567,20 +567,25 @@ Resources:
               - elasticache:ModifyReplicationGroup
               - elasticache:RemoveTagsFromResource
             Resource: '*'
-          - Sid: GlueCatalogAndConnections
+          # A release deploys the platform's Glue jobs: it creates, reads, updates and deletes them.
+          - Sid: GlueCatalogConnectionsAndJobs
             Effect: Allow
             Action:
               - glue:CreateConnection
               - glue:CreateDatabase
+              - glue:CreateJob
               - glue:DeleteConnection
               - glue:DeleteDatabase
+              - glue:DeleteJob
               - glue:GetConnection
               - glue:GetDatabase
+              - glue:GetJob
               - glue:GetTags
               - glue:TagResource
               - glue:UntagResource
               - glue:UpdateConnection
               - glue:UpdateDatabase
+              - glue:UpdateJob
             Resource: '*'
 
   IFTerraformDeployCompute:

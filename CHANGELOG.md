@@ -20,7 +20,7 @@ against `SHA256SUMS` in this repository.
 
 - **`IFTerraformDeployIam`, `IFTerraformDeployNetwork`, `IFTerraformDeployData` and
   `IFTerraformDeployCompute`**, the four managed policies attached to the role. They
-  name 378 individual actions between them, each written in full: there is no asterisk
+  name 382 individual actions between them, each written in full: there is no asterisk
   anywhere in the four documents, so the answer to "can it do X" is a search of a list
   rather than a judgement about what a wildcard covers. Four policies rather than one
   because a single document would exceed the 6,144 character limit AWS places on a
@@ -134,6 +134,10 @@ carries `ecr`, `ecs` and `application-autoscaling` because the roles the deploym
 creates for those applications push images, register task definitions and scale the
 service, and its `iam:CreateServiceLinkedRole` condition allows
 `ecs.application-autoscaling.amazonaws.com` and `spot.amazonaws.com`.
+
+`glue` is there because each environment's catalog database and JDBC connections are
+created by the deployment, and a release deploys the platform's Glue jobs: so the role
+may create, read, update and delete Glue jobs as well.
 
 `sqs` is there because each environment's task-run events reach the platform's API
 through a queue in the environment's own account. `IFTerraformBoundary` carries it
