@@ -836,6 +836,15 @@ Resources:
               - xray:*
             Resource: '*'
 
+          # An agent application's deploy role confirms a rollout by reading its
+          # service's target group and the health of the targets in it. Two reads,
+          # and no other load balancer action.
+          - Effect: Allow
+            Action:
+              - elasticloadbalancing:DescribeTargetGroups
+              - elasticloadbalancing:DescribeTargetHealth
+            Resource: '*'
+
           # KMS is narrower on purpose. Key deletion and key-policy changes are
           # irreversible, and would reach a key you supplied rather than one we
           # created, so the ceiling covers only the operations the platform performs.
