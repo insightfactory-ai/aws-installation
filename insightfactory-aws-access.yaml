@@ -836,9 +836,7 @@ Resources:
               - xray:*
             Resource: '*'
 
-          # An agent application's deploy role confirms a rollout by reading its
-          # service's target group and the health of the targets in it. Two reads,
-          # and no other load balancer action.
+          # The agent deploy role reads target group health to verify a rollout.
           - Effect: Allow
             Action:
               - elasticloadbalancing:DescribeTargetGroups

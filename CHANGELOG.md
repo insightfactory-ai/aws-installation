@@ -137,8 +137,9 @@ service, and its `iam:CreateServiceLinkedRole` condition allows
 It also carries two `elasticloadbalancing` reads, `DescribeTargetGroups` and
 `DescribeTargetHealth`, and no other load balancer action, because an agent
 application's deploy role confirms a rollout by reading its service's target group
-and the health of the targets in it. An account that runs an agent application needs
-a stack update before that check can pass.
+and the health of the targets in it. The boundary only caps the role: the deploy
+role's own policy must grant both reads as well. An account whose access stack
+predates this change needs a stack update before an agent rollout can verify itself.
 
 `glue` is there because each environment's catalog database and JDBC connections are
 created by the deployment, and a release deploys the platform's Glue jobs: so the role
