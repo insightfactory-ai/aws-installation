@@ -836,6 +836,13 @@ Resources:
               - xray:*
             Resource: '*'
 
+          # The agent deploy role reads target group health to verify a rollout.
+          - Effect: Allow
+            Action:
+              - elasticloadbalancing:DescribeTargetGroups
+              - elasticloadbalancing:DescribeTargetHealth
+            Resource: '*'
+
           # KMS is narrower on purpose. Key deletion and key-policy changes are
           # irreversible, and would reach a key you supplied rather than one we
           # created, so the ceiling covers only the operations the platform performs.
